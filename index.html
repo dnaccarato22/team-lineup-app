@@ -28,7 +28,7 @@
             </div>
             <ul class="list-unstyled components text-secondary">
                 <li>
-                    <a href="dashboard.html"><i class="fas fa-home"></i> Lineup</a>
+                    <a href="index.html"><i class="fas fa-home"></i> Lineup</a>
                 </li>
                 <li>
                     <a href="forms.html"><i class="fas fa-file-alt"></i> Forms</a>
@@ -151,11 +151,12 @@
                 <div class="container">
                     <div class="row">
                         <div class="col-md-12 page-header">
-                            <div class="page-pretitle">Overview</div>
-                            <h2 class="page-title">Dashboard</h2>
+                            <div class="page-pretitle">Generate</div>
+                            <h2 class="page-title">Lineup</h2>
                         </div>
+                        <button id="healthCheckBtn" type="button" class="btn btn-primary mb-2">Health Check</button>
                     </div>
-                    <div class="row">
+                    <!-- <div class="row">
                         <div class="col-sm-6 col-md-6 col-lg-3 mt-3">
                             <div class="card">
                                 <div class="content">
@@ -256,9 +257,9 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                     <div class="row">
-                        <div class="col-md-12">
+                        <!-- <div class="col-md-12">
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="card">
@@ -287,20 +288,20 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div> -->
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="content">
                                     <div class="head">
-                                        <h5 class="mb-0">Top Visitors by Country</h5>
-                                        <p class="text-muted">Current year website visitor data</p>
+                                        <h5 class="mb-0">Roster</h5>
+                                        <p class="text-muted">Edit attendance and inning availability</p>
                                     </div>
                                     <div class="canvas-wrapper">
                                         <table class="table table-striped">
                                             <thead class="success">
                                                 <tr>
-                                                    <th>Country</th>
-                                                    <th class="text-end">Unique Visitors</th>
+                                                    <th>Player</th>
+                                                    <th class="text-end">Innings</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -350,7 +351,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <!-- <div class="col-md-6">
                             <div class="card">
                                 <div class="content">
                                     <div class="head">
@@ -411,9 +412,9 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div> -->
                     </div>
-                    <div class="row">
+                    <!-- <div class="row">
                         <div class="col-sm-6 col-md-6 col-lg-3">
                             <div class="card">
                                 <div class="content">
@@ -466,7 +467,7 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </div>
@@ -476,6 +477,7 @@
     <script src="assets/vendor/chartsjs/Chart.min.js"></script>
     <script src="assets/js/dashboard-charts.js"></script>
     <script src="assets/js/script.js"></script>
+    <script src="assets/api/healthcheck.js"></script>
 </body>
 
 </html>
