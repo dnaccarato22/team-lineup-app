@@ -1,0 +1,169 @@
+<script>
+    // Redirect to login if not signed in
+    if(sessionStorage.getItem("loggedIn") !== "true") {
+        window.location.href = "index.html";
+    }
+</script>
+
+<!doctype html>
+<!-- 
+* Bootstrap Simple Admin Template
+* Version: 2.1
+* Author: Alexis Luna
+* Website: https://github.com/alexis-luna/bootstrap-simple-admin-template
+-->
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Dashboard | Bootstrap Simple Admin Template</title>
+    <link href="assets/vendor/fontawesome/css/fontawesome.min.css" rel="stylesheet">
+    <link href="assets/vendor/fontawesome/css/solid.min.css" rel="stylesheet">
+    <link href="assets/vendor/fontawesome/css/brands.min.css" rel="stylesheet">
+    <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/master.css" rel="stylesheet">
+    <link href="assets/vendor/flagiconcss/css/flag-icon.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="wrapper">
+        <nav id="sidebar" class="active">
+            <div class="sidebar-header">
+                <img src="assets/img/bootstraper-logo.png" alt="bootraper logo" class="app-logo">
+            </div>
+            <ul class="list-unstyled components text-secondary">
+                <li>
+                    <a href="lineup.html"><i class="fas fa-home"></i> Lineup</a>
+                </li>
+                <li>
+                    <a href="players.html"><i class="fas fa-users"></i> Players</a>
+                </li>
+                <li>
+                    <a href="settings.html"><i class="fas fa-cog"></i> Settings</a>
+                </li>
+            </ul>
+        </nav>
+        <div id="body" class="active">
+            <!-- navbar navigation component -->
+            <nav class="navbar navbar-expand-lg navbar-white bg-white">
+                <button type="button" id="sidebarCollapse" class="btn btn-light">
+                    <i class="fas fa-bars"></i><span></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="nav navbar-nav ms-auto">
+                        <li class="nav-item dropdown">
+                            <div class="nav-dropdown">
+                                <a href="#" id="nav2" class="nav-item nav-link dropdown-toggle text-secondary" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-user"></i> <span>Account</span> <i style="font-size: .8em;" class="fas fa-caret-down"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end nav-link-menu">
+                                    <ul class="nav-list">
+                                        <li><a id="logoutBtn" href="index.html" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            <!-- end of navbar navigation -->
+            <div class="content">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md-12 page-header">
+                            <div class="page-pretitle">Generate</div>
+                            <h2 class="page-title">Lineup</h2>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="content">
+                                    <div class="head">
+                                        <h5 class="mb-0">Roster</h5>
+                                        <p class="text-muted">Add players to the game</p>
+                                    </div>
+                                    <div class="canvas-wrapper">
+                                        <div class="mb-3">
+                                            <label for="playerSearch" class="form-label">Available Players</label>
+                                            <div class="d-flex gap-2 align-items-start">
+                                                <div class="position-relative flex-grow-1">
+                                                    <input
+                                                        id="playerSearch"
+                                                        type="search"
+                                                        class="form-control"
+                                                        placeholder="Search by first name"
+                                                        aria-label="Search available players by first name"
+                                                        autocomplete="off"
+                                                    >
+                                                    <div id="playerSearchDropdown" class="list-group position-absolute w-100 shadow-sm" style="top: calc(100% + 0.25rem); z-index: 10; display: none; max-height: 16rem; overflow-y: auto;"></div>
+                                                </div>
+                                                <select id="playerSelect" class="d-none" aria-hidden="true" tabindex="-1">
+                                                    <option value="">Loading players...</option>
+                                                </select>
+                                                <button id="addPlayerBtn" type="button" class="btn btn-primary">Add</button>
+                                            </div>
+                                            <div id="player_spinner" class="text-center" style="display:none;">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <table class="table table-striped align-middle">
+                                            <thead class="success">
+                                                <tr>
+                                                    <th>Player</th>
+                                                    <th class="text-end">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="rosterTableBody">
+                                                <tr>
+                                                    <td colspan="2" class="text-muted text-center">No players added yet.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div class="d-flex gap-2">
+                                            <button id="generateLineupBtn" type="button" class="btn btn-success">Generate Lineup</button>
+                                            <button id="clearRosterBtn" type="button" class="btn btn-outline-secondary">Clear Roster</button>
+                                        </div>
+                                        <div id="lineupStatus" class="mt-3 text-muted"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="content">
+                                    <div class="head">
+                                        <h5 class="mb-0">Generated Lineup</h5>
+                                        <p class="text-muted">Latest smart lineup results</p>
+                                    </div>
+                                    <div id="lineup_spinner" class="text-center" style="display:none;">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                    <div class="canvas-wrapper">
+                                        <div id="lineupResult" class="bg-light border rounded p-3">
+                                            <div class="text-muted">Generate a lineup to see results.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="assets/vendor/jquery/jquery.min.js"></script>
+    <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/script.js"></script>
+    <script src="assets/api/healthcheck.js"></script>
+    <script src="assets/js/logout.js"></script>
+    <script src="assets/js/lineup.js"></script>
+</body>
+
+</html>
