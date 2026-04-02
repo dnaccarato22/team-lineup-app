@@ -13,6 +13,7 @@ const addPlayerBtn = document.getElementById("addPlayerBtn");
 const rosterTableBody = document.getElementById("rosterTableBody");
 const clearRosterBtn = document.getElementById("clearRosterBtn");
 const generateLineupBtn = document.getElementById("generateLineupBtn");
+const downloadLineupBtn = document.getElementById("downloadLineupBtn");
 const lineupResult = document.getElementById("lineupResult");
 const lineupStatus = document.getElementById("lineupStatus");
 
@@ -102,6 +103,7 @@ function renderGeneratedLineup(lineup) {
 
     if (!players.length) {
         lineupResult.innerHTML = '<div class="text-muted">No lineup data was returned.</div>';
+        downloadLineupBtn.disabled = true;
         return;
     }
 
@@ -126,12 +128,59 @@ function renderGeneratedLineup(lineup) {
                 '<thead>' +
                     '<tr>' +
                         '<th>Player</th>' +
-                        inningNumbers.map((inningNumber) => '<th class="text-center">Inning ' + inningNumber + '</th>').join("") +
+                        inningNumbers.map((inningNumber) => '<th class="text-center">' + inningNumber + '</th>').join("") +
                     '</tr>' +
                 '</thead>' +
                 '<tbody>' + lineupRows + '</tbody>' +
             '</table>' +
         '</div>';
+    downloadLineupBtn.disabled = false;
+}
+
+function downloadLineupPdf() {
+    const lineupTable = lineupResult.querySelector("table");
+
+    if (!lineupTable) {
+        lineupStatus.textContent = "Generate a lineup before downloading the PDF.";
+        return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+
+    if (!printWindow) {
+        lineupStatus.textContent = "Unable to open the PDF preview window.";
+        return;
+    }
+
+    const printMarkup =
+        '<!doctype html>' +
+        '<html><head><title>lineup.pdf</title>' +
+        '<meta charset="utf-8">' +
+        '<style>' +
+            '@page{size:auto;margin:0.5in;}' +
+            'body{font-family:Arial,sans-serif;padding:24px;color:#212529;}' +
+            'h1{margin:0 0 16px;font-size:24px;}' +
+            'table{width:100%;border-collapse:collapse;}' +
+            'th,td{border:1px solid #ced4da;padding:8px;text-align:center;}' +
+            'th:first-child,td:first-child{text-align:left;}' +
+            'thead th{background:#f8f9fa;}' +
+        '</style></head><body>' +
+        '<h1>Lineup</h1>' +
+        lineupTable.outerHTML +
+        '<script>' +
+            'window.addEventListener("load", function () {' +
+                'setTimeout(function () {' +
+                    'window.focus();' +
+                    'window.print();' +
+                '}, 250);' +
+            '});' +
+        '<\/script>' +
+        '</body></html>';
+
+    printWindow.document.open();
+    printWindow.document.write(printMarkup);
+    printWindow.document.close();
+    lineupStatus.textContent = "Opening PDF print preview...";
 }
 
 async function loadPlayers() {
@@ -160,6 +209,7 @@ async function loadPlayers() {
 async function generateLineup() {
     const spinner = document.getElementById("lineup_spinner");
     spinner.style.display = "block";
+    downloadLineupBtn.disabled = true;
 
     if (!rosterState.selectedPlayers.length) {
         lineupStatus.textContent = "Add at least one player before generating a lineup.";
@@ -197,6 +247,7 @@ async function generateLineup() {
     }
 
     lineupResult.innerHTML = '<div class="text-muted">Unable to generate lineup with the configured endpoint options.</div>';
+    downloadLineupBtn.disabled = true;
     lineupStatus.textContent = "Lineup generation failed.";
 }
 
@@ -271,8 +322,10 @@ clearRosterBtn.addEventListener("click", () => {
     playerSelect.value = "";
     renderRoster();
     renderPlayerOptions();
+    downloadLineupBtn.disabled = true;
     lineupStatus.textContent = "Roster cleared.";
 });
 
 generateLineupBtn.addEventListener("click", generateLineup);
+downloadLineupBtn.addEventListener("click", downloadLineupPdf);
 loadPlayers();
