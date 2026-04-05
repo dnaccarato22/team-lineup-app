@@ -1,5 +1,13 @@
 const API_BASE_URL = "https://team-lineup-api.onrender.com";
 
+const fallbackSettings = {
+    playerNameFormat: "abbreviated",
+    lineupNameFormat: "abbreviated",
+    rememberRoster: true,
+    lineupSortOrder: "first_name_asc",
+    inningsToDisplay: 9
+};
+
 const rosterState = {
     allPlayers: [],
     selectedPlayers: [],
@@ -9,7 +17,6 @@ const rosterState = {
 const playerSearch = document.getElementById("playerSearch");
 const playerSelect = document.getElementById("playerSelect");
 const playerSearchDropdown = document.getElementById("playerSearchDropdown");
-const addPlayerBtn = document.getElementById("addPlayerBtn");
 const rosterTableBody = document.getElementById("rosterTableBody");
 const clearRosterBtn = document.getElementById("clearRosterBtn");
 const generateLineupBtn = document.getElementById("generateLineupBtn");
@@ -17,33 +24,136 @@ const downloadLineupBtn = document.getElementById("downloadLineupBtn");
 const lineupResult = document.getElementById("lineupResult");
 const lineupStatus = document.getElementById("lineupStatus");
 
-function getPlayerName(player) {
-    if (player.first_name && player.last_name) {
-        return player.first_name + " " + player.last_name.charAt(0) + ".";
+function getSettings() {
+    return window.AppSettings?.getSettings ? window.AppSettings.getSettings() : fallbackSettings;
+}
+
+function getPlayerId(player) {
+    return player.player_id ?? player.id;
+}
+
+function getPlayerName(player, formatOverride) {
+    const nameFormat = formatOverride || getSettings().playerNameFormat;
+    const firstName = String(player.first_name || "").trim();
+    const lastName = String(player.last_name || "").trim();
+
+    if (nameFormat === "full" && (firstName || lastName)) {
+        return [firstName, lastName].filter(Boolean).join(" ");
     }
 
-    if (player.first_name) {
-        return player.first_name;
+    if (firstName && lastName) {
+        return firstName + " " + lastName.charAt(0) + ".";
+    }
+
+    if (firstName) {
+        return firstName;
+    }
+
+    if (lastName) {
+        return lastName;
     }
 
     return player.name || ("Player " + (player.id || ""));
 }
 
-function getPlayerId(player) {
-    return player.player_id;
+function getOverallRating(player) {
+    if (Array.isArray(player.position_scores)) {
+        return player.position_scores.reduce((total, entry) => {
+            return total + (Number.parseInt(entry.score, 10) || 0);
+        }, 0);
+    }
+
+    return ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"].reduce((total, position) => {
+        return total + (Number.parseInt(player[position], 10) || 0);
+    }, 0);
+}
+
+function compareText(a, b) {
+    return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+function sortPlayers(players) {
+    const sortOrder = getSettings().lineupSortOrder;
+    const sortedPlayers = [...players];
+
+    sortedPlayers.sort((firstPlayer, secondPlayer) => {
+        if (sortOrder === "rating_desc") {
+            const ratingDifference = getOverallRating(secondPlayer) - getOverallRating(firstPlayer);
+
+            if (ratingDifference !== 0) {
+                return ratingDifference;
+            }
+        }
+
+        if (sortOrder === "last_name_asc") {
+            const lastNameComparison = compareText(firstPlayer.last_name || "", secondPlayer.last_name || "");
+
+            if (lastNameComparison !== 0) {
+                return lastNameComparison;
+            }
+
+            return compareText(firstPlayer.first_name || "", secondPlayer.first_name || "");
+        }
+
+        const firstNameComparison = compareText(firstPlayer.first_name || "", secondPlayer.first_name || "");
+
+        if (firstNameComparison !== 0) {
+            return firstNameComparison;
+        }
+
+        return compareText(firstPlayer.last_name || "", secondPlayer.last_name || "");
+    });
+
+    return sortedPlayers;
+}
+
+function saveRememberedRoster() {
+    const playerIds = rosterState.selectedPlayers.map((player) => String(getPlayerId(player)));
+
+    if (!getSettings().rememberRoster) {
+        window.AppSettings?.clearSavedRoster?.();
+        return;
+    }
+
+    window.AppSettings?.saveSavedRosterIds?.(playerIds);
+}
+
+function restoreRememberedRoster() {
+    if (!getSettings().rememberRoster) {
+        window.AppSettings?.clearSavedRoster?.();
+        rosterState.selectedPlayers = [];
+        return false;
+    }
+
+    const savedRosterIds = window.AppSettings?.getSavedRosterIds?.() || [];
+
+    if (!savedRosterIds.length) {
+        rosterState.selectedPlayers = [];
+        return false;
+    }
+
+    rosterState.selectedPlayers = savedRosterIds
+        .map((savedPlayerId) => {
+            return rosterState.allPlayers.find((player) => String(getPlayerId(player)) === String(savedPlayerId));
+        })
+        .filter(Boolean);
+
+    saveRememberedRoster();
+    return rosterState.selectedPlayers.length > 0;
 }
 
 function getAvailablePlayers() {
     const normalizedSearchTerm = rosterState.searchTerm.trim().toLowerCase();
 
-    return rosterState.allPlayers.filter((player) => {
+    return sortPlayers(rosterState.allPlayers.filter((player) => {
         const playerId = String(getPlayerId(player));
         const isSelected = rosterState.selectedPlayers.some((selectedPlayer) => String(getPlayerId(selectedPlayer)) === playerId);
         const firstName = (player.first_name || "").toLowerCase();
-        const matchesSearch = !normalizedSearchTerm || firstName.includes(normalizedSearchTerm);
+        const lastName = (player.last_name || "").toLowerCase();
+        const matchesSearch = !normalizedSearchTerm || firstName.includes(normalizedSearchTerm) || lastName.includes(normalizedSearchTerm);
 
         return !isSelected && matchesSearch;
-    });
+    }));
 }
 
 function renderPlayerOptions() {
@@ -86,6 +196,27 @@ function selectPlayer(playerId) {
     playerSearchDropdown.style.display = "none";
 }
 
+function addSelectedPlayer(playerId) {
+    if (!playerId) {
+        return;
+    }
+
+    const player = rosterState.allPlayers.find((candidate) => String(getPlayerId(candidate)) === playerId);
+
+    if (!player) {
+        return;
+    }
+
+    rosterState.selectedPlayers.push(player);
+    rosterState.searchTerm = "";
+    playerSearch.value = "";
+    playerSelect.value = "";
+    renderRoster();
+    renderPlayerOptions();
+    saveRememberedRoster();
+    lineupStatus.textContent = getPlayerName(player) + " added to the roster.";
+}
+
 function renderRoster() {
     if (!rosterState.selectedPlayers.length) {
         rosterTableBody.innerHTML = '<tr><td colspan="2" class="text-muted text-center">No players added yet.</td></tr>';
@@ -107,7 +238,7 @@ function renderGeneratedLineup(lineup) {
         return;
     }
 
-    const inningNumbers = Array.from({ length: 9 }, (_, index) => index + 1);
+    const inningNumbers = Array.from({ length: getSettings().inningsToDisplay }, (_, index) => index + 1);
     const lineupRows = players.map((player) => {
         const inningMap = new Map((player.innings || []).map((inningEntry) => [inningEntry.inning, inningEntry.position]));
         const inningCells = inningNumbers.map((inningNumber) => {
@@ -115,7 +246,7 @@ function renderGeneratedLineup(lineup) {
             return '<td class="text-center">' + position + '</td>';
         }).join("");
 
-        return '<tr><td class="fw-semibold">' + getPlayerName(player) + '</td>' + inningCells + '</tr>';
+        return '<tr><td class="fw-semibold">' + getPlayerName(player, getSettings().lineupNameFormat) + '</td>' + inningCells + '</tr>';
     }).join("");
 
     lineupResult.innerHTML =
@@ -189,12 +320,16 @@ async function loadPlayers() {
     spinner.style.display = "block";
 
     try {
-        console.log("Fetching players from API...");
         const response = await fetch(API_BASE_URL + "/players");
         const data = await response.json();
         rosterState.allPlayers = Array.isArray(data) ? data : (data.players || []);
+
+        const restoredSavedRoster = restoreRememberedRoster();
+        renderRoster();
         renderPlayerOptions();
-        lineupStatus.textContent = rosterState.allPlayers.length ? "Players loaded." : "No players returned by the API.";
+        lineupStatus.textContent = rosterState.allPlayers.length
+            ? (restoredSavedRoster ? "Players loaded. Saved roster restored." : "Players loaded.")
+            : "No players returned by the API.";
     } catch (error) {
         console.error("Error loading players:", error);
         lineupStatus.textContent = "Unable to load players.";
@@ -221,57 +356,31 @@ async function generateLineup() {
         player_ids: rosterState.selectedPlayers.map((player) => getPlayerId(player))
     };
 
-    const endpoints = [
-        { path: "/generate_lineup", options: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) } }
-    ];
-
     lineupResult.innerHTML = '<div class="text-muted">Generating lineup...</div>';
 
-    for (const endpoint of endpoints) {
-        try {
-            const response = await fetch(API_BASE_URL + endpoint.path, endpoint.options);
+    try {
+        const response = await fetch(API_BASE_URL + "/generate_lineup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
 
-            if (!response.ok) {
-                continue;
-            }
-
-            const data = await response.json();
-            renderGeneratedLineup(data);
-            lineupStatus.textContent = "Lineup generated.";
-            return;
-        } catch (error) {
-            console.error("Error generating lineup from " + endpoint.path + ":", error);
-        } finally {
-            spinner.style.display = "none";
+        if (!response.ok) {
+            throw new Error("Lineup request failed with status " + response.status + ".");
         }
-    }
 
-    lineupResult.innerHTML = '<div class="text-muted">Unable to generate lineup with the configured endpoint options.</div>';
-    downloadLineupBtn.disabled = true;
-    lineupStatus.textContent = "Lineup generation failed.";
+        const data = await response.json();
+        renderGeneratedLineup(data);
+        lineupStatus.textContent = "Lineup generated.";
+    } catch (error) {
+        console.error("Error generating lineup:", error);
+        lineupResult.innerHTML = '<div class="text-muted">Unable to generate lineup with the configured endpoint options.</div>';
+        downloadLineupBtn.disabled = true;
+        lineupStatus.textContent = "Lineup generation failed.";
+    } finally {
+        spinner.style.display = "none";
+    }
 }
-
-addPlayerBtn.addEventListener("click", () => {
-    const selectedPlayerId = playerSelect.value;
-
-    if (!selectedPlayerId) {
-        return;
-    }
-
-    const player = rosterState.allPlayers.find((candidate) => String(getPlayerId(candidate)) === selectedPlayerId);
-
-    if (!player) {
-        return;
-    }
-
-    rosterState.selectedPlayers.push(player);
-    rosterState.searchTerm = "";
-    playerSearch.value = "";
-    playerSelect.value = "";
-    renderRoster();
-    renderPlayerOptions();
-    lineupStatus.textContent = getPlayerName(player) + " added to the roster.";
-});
 
 playerSearch.addEventListener("input", (event) => {
     rosterState.searchTerm = event.target.value;
@@ -290,7 +399,9 @@ playerSearchDropdown.addEventListener("click", (event) => {
         return;
     }
 
-    selectPlayer(option.getAttribute("data-player-id"));
+    const playerId = option.getAttribute("data-player-id");
+    selectPlayer(playerId);
+    addSelectedPlayer(playerId);
 });
 
 document.addEventListener("click", (event) => {
@@ -312,6 +423,7 @@ rosterTableBody.addEventListener("click", (event) => {
     rosterState.selectedPlayers = rosterState.selectedPlayers.filter((player) => String(getPlayerId(player)) !== playerId);
     renderRoster();
     renderPlayerOptions();
+    saveRememberedRoster();
     lineupStatus.textContent = "Player removed from the roster.";
 });
 
@@ -322,6 +434,7 @@ clearRosterBtn.addEventListener("click", () => {
     playerSelect.value = "";
     renderRoster();
     renderPlayerOptions();
+    saveRememberedRoster();
     downloadLineupBtn.disabled = true;
     lineupStatus.textContent = "Roster cleared.";
 });
