@@ -789,6 +789,23 @@ table.dataTable>tbody>tr.child ul.dtr-details {
     }
 }
 
+@media (max-width: 680px) {
+    #body .nav-dropdown .nav-link-menu.dropdown-menu-end {
+        position: absolute !important;
+        top: calc(100% + 0.25rem) !important;
+        right: 0 !important;
+        left: auto !important;
+        width: auto !important;
+        min-width: 9rem;
+        max-width: 12rem;
+        margin-top: 0;
+    }
+
+    #body .nav-dropdown .nav-link-menu.dropdown-menu-end::before {
+        right: 1rem;
+    }
+}
+
 @media (min-width: 200px) {
     .navbar-expand-lg .navbar-collapse {
         display: -ms-flexbox !important;

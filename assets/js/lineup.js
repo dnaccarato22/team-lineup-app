@@ -18,11 +18,13 @@ const playerSearch = document.getElementById("playerSearch");
 const playerSelect = document.getElementById("playerSelect");
 const playerSearchDropdown = document.getElementById("playerSearchDropdown");
 const rosterTableBody = document.getElementById("rosterTableBody");
+const rosterMobileList = document.getElementById("rosterMobileList");
 const clearRosterBtn = document.getElementById("clearRosterBtn");
 const generateLineupBtn = document.getElementById("generateLineupBtn");
 const downloadLineupBtn = document.getElementById("downloadLineupBtn");
 const lineupResult = document.getElementById("lineupResult");
 const lineupStatus = document.getElementById("lineupStatus");
+const generatedLineupSection = document.getElementById("generatedLineupSection");
 
 function getSettings() {
     return window.AppSettings?.getSettings ? window.AppSettings.getSettings() : fallbackSettings;
@@ -220,12 +222,27 @@ function addSelectedPlayer(playerId) {
 function renderRoster() {
     if (!rosterState.selectedPlayers.length) {
         rosterTableBody.innerHTML = '<tr><td colspan="2" class="text-muted text-center">No players added yet.</td></tr>';
+        rosterMobileList.innerHTML = '<div class="lineup-mobile-empty">No players added yet.</div>';
         return;
     }
 
     rosterTableBody.innerHTML = rosterState.selectedPlayers.map((player) => {
         const playerId = String(getPlayerId(player)).replace(/"/g, "&quot;");
         return '<tr><td>' + getPlayerName(player) + '</td><td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" data-player-id="' + playerId + '">Remove</button></td></tr>';
+    }).join("");
+
+    rosterMobileList.innerHTML = rosterState.selectedPlayers.map((player) => {
+        const playerId = String(getPlayerId(player)).replace(/"/g, "&quot;");
+
+        return '<div class="lineup-mobile-roster-card">' +
+            '<div class="lineup-mobile-roster-header">' +
+                '<div>' +
+                    '<h6 class="lineup-mobile-player-name">' + getPlayerName(player) + '</h6>' +
+                    '<p class="lineup-mobile-player-subtitle">Selected for this roster</p>' +
+                '</div>' +
+                '<button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" data-player-id="' + playerId + '">Remove</button>' +
+            '</div>' +
+        '</div>';
     }).join("");
 }
 
@@ -346,8 +363,8 @@ async function generateLineup() {
     spinner.style.display = "block";
     downloadLineupBtn.disabled = true;
 
-    if (!rosterState.selectedPlayers.length) {
-        lineupStatus.textContent = "Add at least one player before generating a lineup.";
+    if (rosterState.selectedPlayers.length < 9) {
+        lineupStatus.textContent = "9 players required to generate a lineup.";
         spinner.style.display = "none";
         return;
     }
@@ -357,6 +374,7 @@ async function generateLineup() {
     };
 
     lineupResult.innerHTML = '<div class="text-muted">Generating lineup...</div>';
+    generatedLineupSection?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     try {
         const response = await fetch(API_BASE_URL + "/generate_lineup", {
@@ -412,7 +430,7 @@ document.addEventListener("click", (event) => {
     playerSearchDropdown.style.display = "none";
 });
 
-rosterTableBody.addEventListener("click", (event) => {
+function handleRemovePlayerClick(event) {
     const removeButton = event.target.closest(".remove-player-btn");
 
     if (!removeButton) {
@@ -425,7 +443,10 @@ rosterTableBody.addEventListener("click", (event) => {
     renderPlayerOptions();
     saveRememberedRoster();
     lineupStatus.textContent = "Player removed from the roster.";
-});
+}
+
+rosterTableBody.addEventListener("click", handleRemovePlayerClick);
+rosterMobileList.addEventListener("click", handleRemovePlayerClick);
 
 clearRosterBtn.addEventListener("click", () => {
     rosterState.selectedPlayers = [];

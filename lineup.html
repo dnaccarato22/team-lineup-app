@@ -25,6 +25,7 @@
     <link href="assets/vendor/fontawesome/css/brands.min.css" rel="stylesheet">
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/master.css" rel="stylesheet">
+    <link href="assets/css/lineup.css" rel="stylesheet">
     <link href="assets/vendor/flagiconcss/css/flag-icon.min.css" rel="stylesheet">
 </head>
 
@@ -74,8 +75,8 @@
                 <div class="container">
                     <div class="row">
                         <div class="col-md-12 page-header">
-                            <div class="page-pretitle">Generate</div>
-                            <h2 class="page-title">Lineup</h2>
+                            <div class="page-pretitle desktop-only">Generate Lineup</div>
+                            <h2 class="page-title desktop-only">Lineup</h2>
                         </div>
                     </div>
                     <div class="row">
@@ -84,12 +85,12 @@
                                 <div class="content">
                                     <div class="head">
                                         <h5 class="mb-0">Roster</h5>
-                                        <p class="text-muted">Add players to the game</p>
+                                        <p class="text-muted desktop-only">Add players to the game</p>
                                     </div>
                                     <div class="canvas-wrapper">
                                         <div class="mb-3">
                                             <label for="playerSearch" class="form-label">Available Players</label>
-                                            <div class="d-flex gap-2 align-items-start">
+                                            <div class="d-flex gap-2 align-items-start lineup-player-picker">
                                                 <div class="position-relative flex-grow-1">
                                                     <input
                                                         id="playerSearch"
@@ -106,25 +107,31 @@
                                                 </select>
                                             </div>
                                             <div id="player_spinner" class="text-center" style="display:none;">
+                                                <br>
                                                 <div class="spinner-border text-primary" role="status">
                                                     <span class="visually-hidden">Loading...</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <table class="table table-striped align-middle">
-                                            <thead class="success">
-                                                <tr>
-                                                    <th>Player</th>
-                                                    <th class="text-end">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="rosterTableBody">
-                                                <tr>
-                                                    <td colspan="2" class="text-muted text-center">No players added yet.</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                        <div class="d-flex gap-2">
+                                        <div class="table-responsive d-none d-md-block">
+                                            <table class="table table-striped align-middle">
+                                                <thead class="success">
+                                                    <tr>
+                                                        <th>Player</th>
+                                                        <th class="text-end">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="rosterTableBody">
+                                                    <tr>
+                                                        <td colspan="2" class="text-muted text-center">No players added yet.</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div id="rosterMobileList" class="d-block d-md-none lineup-mobile-roster-list">
+                                            <div class="lineup-mobile-empty">No players added yet.</div>
+                                        </div>
+                                        <div class="d-flex gap-2 lineup-action-buttons">
                                             <button id="generateLineupBtn" type="button" class="btn btn-success">Generate Lineup</button>
                                             <button id="clearRosterBtn" type="button" class="btn btn-outline-secondary">Clear Roster</button>
                                         </div>
@@ -133,10 +140,10 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div id="generatedLineupSection" class="col-md-6">
                             <div class="card">
                                 <div class="content">
-                                    <div class="head d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                    <div class="head d-flex justify-content-between align-items-start gap-3 flex-wrap lineup-result-head">
                                         <div>
                                             <h5 class="mb-0">Generated Lineup</h5>
                                             <p class="text-muted">Latest smart lineup results</p>
@@ -146,10 +153,12 @@
                                         </button>
                                     </div>
                                     <div id="lineup_spinner" class="text-center" style="display:none;">
+                                        <br>
                                         <div class="spinner-border text-primary" role="status">
                                             <span class="visually-hidden">Loading...</span>
                                         </div>
                                     </div>
+                                    <br>
                                     <div class="canvas-wrapper">
                                         <div id="lineupResult" class="bg-light border rounded p-3">
                                             <div class="text-muted">Generate a lineup to see results.</div>

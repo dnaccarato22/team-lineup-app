@@ -5,6 +5,7 @@ const POSITION_FIELDS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
 const playerSearchInput = document.getElementById("playerSearchInput");
 const addPlayerBtn = document.getElementById("addPlayerBtn");
 const playersTableBody = document.getElementById("playersTableBody");
+const playersMobileList = document.getElementById("playersMobileList");
 const playerStatus = document.getElementById("playerStatus");
 const playerSpinner = document.getElementById("player_spinner");
 
@@ -122,11 +123,18 @@ function getFilteredPlayers() {
     });
 }
 
+function buildScoreOptions(selectedValue) {
+    return Array.from({ length: 6 }, (_, score) => {
+        const selectedAttribute = Number(selectedValue) === score ? ' selected' : "";
+        return '<option value="' + score + '"' + selectedAttribute + ">" + score + "</option>";
+    }).join("");
+}
+
 function renderValueCell(value) {
     return '<td class="text-center">' + escapeHtml(value) + "</td>";
 }
 
-function renderEditableCell(playerKey, fieldName, type, value, options) {
+function renderEditableCell(playerKey, fieldName, type, value) {
     const inputClass = type === "number" ? "form-control form-control-sm text-center" : "form-control form-control-sm";
     const minAttr = type === "number" ? ' min="0" max="5"' : "";
 
@@ -136,7 +144,7 @@ function renderEditableCell(playerKey, fieldName, type, value, options) {
 }
 
 function renderEditableRow(playerKey, draft, isNew) {
-    const positionCells = POSITION_FIELDS.map((position) => renderEditableCell(playerKey, position, "number", draft[position], { isNew })).join("");
+    const positionCells = POSITION_FIELDS.map((position) => renderEditableCell(playerKey, position, "number", draft[position])).join("");
     const actionButtons = isNew
         ? '<button type="button" class="btn btn-sm btn-success save-player-btn" data-player-key="new">Save</button> ' +
             '<button type="button" class="btn btn-sm btn-outline-secondary cancel-player-btn" data-player-key="new">Cancel</button>'
@@ -144,8 +152,8 @@ function renderEditableRow(playerKey, draft, isNew) {
             '<button type="button" class="btn btn-sm btn-outline-secondary cancel-player-btn" data-player-key="' + escapeHtml(playerKey) + '">Cancel</button>';
 
     return "<tr>" +
-        renderEditableCell(playerKey, "first_name", "text", draft.first_name, { isNew }) +
-        renderEditableCell(playerKey, "last_name", "text", draft.last_name, { isNew }) +
+        renderEditableCell(playerKey, "first_name", "text", draft.first_name) +
+        renderEditableCell(playerKey, "last_name", "text", draft.last_name) +
         positionCells +
         '<td class="text-end text-nowrap">' + actionButtons + "</td>" +
         "</tr>";
@@ -166,31 +174,111 @@ function renderReadOnlyRow(player) {
         "</tr>";
 }
 
+function renderMobileScoreSummary(player) {
+    return POSITION_FIELDS.map((position) => {
+        return '<div class="player-mobile-score-item">' +
+            '<span class="player-mobile-score-label">' + escapeHtml(position) + '</span>' +
+            '<div class="player-mobile-score-value">' + escapeHtml(getPositionValue(player, position)) + "</div>" +
+        "</div>";
+    }).join("");
+}
+
+function renderMobileEditableScoreField(playerKey, position, value) {
+    return '<div>' +
+        '<label class="form-label player-mobile-score-label" for="mobile-' + escapeHtml(playerKey) + "-" + escapeHtml(position) + '">' + escapeHtml(position) + "</label>" +
+        '<select id="mobile-' + escapeHtml(playerKey) + "-" + escapeHtml(position) + '" class="form-select player-field-input" data-player-key="' + escapeHtml(playerKey) + '" data-field="' + escapeHtml(position) + '">' +
+            buildScoreOptions(value) +
+        "</select>" +
+    "</div>";
+}
+
+function renderMobileEditableCard(playerKey, draft, isNew) {
+    const actionButtons = isNew
+        ? '<button type="button" class="btn btn-success save-player-btn" data-player-key="new">Save Player</button>' +
+            '<button type="button" class="btn btn-outline-secondary cancel-player-btn" data-player-key="new">Cancel</button>'
+        : '<button type="button" class="btn btn-success save-player-btn" data-player-key="' + escapeHtml(playerKey) + '">Save Changes</button>' +
+            '<button type="button" class="btn btn-outline-secondary cancel-player-btn" data-player-key="' + escapeHtml(playerKey) + '">Cancel</button>';
+
+    return '<details class="player-mobile-card" open>' +
+        '<summary class="player-mobile-header">' +
+            "<div>" +
+                '<h6 class="player-mobile-title mb-0">' + (isNew ? "Add Player" : "Edit Player") + "</h6>" +
+                '<p class="player-mobile-subtitle">' + (isNew ? "Enter player details and set scores." : "Update names and position ratings.") + "</p>" +
+            "</div>" +
+            '<span class="player-mobile-toggle" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>' +
+        "</summary>" +
+        '<div class="player-mobile-content">' +
+        '<div class="player-mobile-form-grid">' +
+            '<div>' +
+                '<label class="form-label" for="mobile-' + escapeHtml(playerKey) + '-first-name">First Name</label>' +
+                '<input id="mobile-' + escapeHtml(playerKey) + '-first-name" type="text" class="form-control player-field-input" data-player-key="' + escapeHtml(playerKey) + '" data-field="first_name" value="' + escapeHtml(draft.first_name) + '">' +
+            "</div>" +
+            '<div>' +
+                '<label class="form-label" for="mobile-' + escapeHtml(playerKey) + '-last-name">Last Name</label>' +
+                '<input id="mobile-' + escapeHtml(playerKey) + '-last-name" type="text" class="form-control player-field-input" data-player-key="' + escapeHtml(playerKey) + '" data-field="last_name" value="' + escapeHtml(draft.last_name) + '">' +
+            "</div>" +
+        "</div>" +
+        '<div class="player-mobile-score-form-grid">' +
+            POSITION_FIELDS.map((position) => renderMobileEditableScoreField(playerKey, position, draft[position])).join("") +
+        "</div>" +
+        '<div class="player-mobile-actions">' + actionButtons + "</div>" +
+        "</div>" +
+    "</details>";
+}
+
+function renderMobileReadOnlyCard(player) {
+    const playerId = String(getPlayerId(player));
+    const fullName = ((player.first_name || "") + " " + (player.last_name || "")).trim() || "Unnamed Player";
+
+    return '<details class="player-mobile-card">' +
+        '<summary class="player-mobile-header">' +
+            "<div>" +
+                '<h6 class="player-mobile-title">' + escapeHtml(fullName) + "</h6>" +
+                '<p class="player-mobile-subtitle">Tap to view scores and actions</p>' +
+            "</div>" +
+            '<span class="player-mobile-toggle" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>' +
+        "</summary>" +
+        '<div class="player-mobile-content">' +
+        '<div class="player-mobile-score-grid">' + renderMobileScoreSummary(player) + "</div>" +
+        '<div class="player-mobile-actions">' +
+            '<button type="button" class="btn btn-outline-primary edit-player-btn" data-player-id="' + escapeHtml(playerId) + '">Edit</button>' +
+            '<button type="button" class="btn btn-outline-danger delete-player-btn" data-player-id="' + escapeHtml(playerId) + '">Remove</button>' +
+        "</div>" +
+        "</div>" +
+    "</details>";
+}
+
 function renderPlayers() {
     const filteredPlayers = getFilteredPlayers();
-    const rows = [];
+    const tableRows = [];
+    const mobileCards = [];
 
     if (playerState.isAdding && playerState.newPlayerDraft) {
-        rows.push(renderEditableRow("new", playerState.newPlayerDraft, true));
+        tableRows.push(renderEditableRow("new", playerState.newPlayerDraft, true));
+        mobileCards.push(renderMobileEditableCard("new", playerState.newPlayerDraft, true));
     }
 
     filteredPlayers.forEach((player) => {
         const playerId = String(getPlayerId(player));
 
         if (playerState.editingPlayerId === playerId && playerState.editDraft) {
-            rows.push(renderEditableRow(playerId, playerState.editDraft, false));
+            tableRows.push(renderEditableRow(playerId, playerState.editDraft, false));
+            mobileCards.push(renderMobileEditableCard(playerId, playerState.editDraft, false));
             return;
         }
 
-        rows.push(renderReadOnlyRow(player));
+        tableRows.push(renderReadOnlyRow(player));
+        mobileCards.push(renderMobileReadOnlyCard(player));
     });
 
-    if (!rows.length) {
+    if (!tableRows.length) {
         playersTableBody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No players found.</td></tr>';
+        playersMobileList.innerHTML = '<div class="player-mobile-empty">No players found.</div>';
         return;
     }
 
-    playersTableBody.innerHTML = rows.join("");
+    playersTableBody.innerHTML = tableRows.join("");
+    playersMobileList.innerHTML = mobileCards.join("");
 }
 
 function resetEditingState() {
@@ -365,20 +453,7 @@ async function deletePlayer(playerId) {
     }
 }
 
-addPlayerBtn.addEventListener("click", () => {
-    resetEditingState();
-    playerState.isAdding = true;
-    playerState.newPlayerDraft = createEmptyDraft();
-    playerStatus.textContent = "Enter the new player details, then save.";
-    renderPlayers();
-});
-
-playerSearchInput.addEventListener("input", (event) => {
-    playerState.searchTerm = event.target.value;
-    renderPlayers();
-});
-
-playersTableBody.addEventListener("input", (event) => {
+function handlePlayerFieldInput(event) {
     const input = event.target.closest(".player-field-input");
 
     if (!input) {
@@ -393,21 +468,24 @@ playersTableBody.addEventListener("input", (event) => {
 
     if (playerKey === "new" && playerState.newPlayerDraft) {
         playerState.newPlayerDraft[field] = nextValue;
-        if (input.type === "number") {
+
+        if (input.tagName === "INPUT" && input.type === "number") {
             input.value = String(nextValue);
         }
+
         return;
     }
 
     if (playerState.editDraft && playerState.editingPlayerId === playerKey) {
         playerState.editDraft[field] = nextValue;
-        if (input.type === "number") {
+
+        if (input.tagName === "INPUT" && input.type === "number") {
             input.value = String(nextValue);
         }
     }
-});
+}
 
-playersTableBody.addEventListener("click", (event) => {
+function handlePlayerActionClick(event) {
     const editButton = event.target.closest(".edit-player-btn");
     const saveButton = event.target.closest(".save-player-btn");
     const cancelButton = event.target.closest(".cancel-player-btn");
@@ -459,6 +537,25 @@ playersTableBody.addEventListener("click", (event) => {
     if (deleteButton) {
         deletePlayer(deleteButton.getAttribute("data-player-id"));
     }
+}
+
+addPlayerBtn.addEventListener("click", () => {
+    resetEditingState();
+    playerState.isAdding = true;
+    playerState.newPlayerDraft = createEmptyDraft();
+    playerStatus.textContent = "Enter the new player details, then save.";
+    renderPlayers();
+});
+
+playerSearchInput.addEventListener("input", (event) => {
+    playerState.searchTerm = event.target.value;
+    renderPlayers();
+});
+
+[playersTableBody, playersMobileList].forEach((container) => {
+    container.addEventListener("input", handlePlayerFieldInput);
+    container.addEventListener("change", handlePlayerFieldInput);
+    container.addEventListener("click", handlePlayerActionClick);
 });
 
 loadPlayers();
