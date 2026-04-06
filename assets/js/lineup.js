@@ -26,13 +26,22 @@ const downloadLineupBtn = document.getElementById("downloadLineupBtn");
 const lineupResult = document.getElementById("lineupResult");
 const lineupStatus = document.getElementById("lineupStatus");
 const generatedLineupSection = document.getElementById("generatedLineupSection");
+const LINEUP_PAGE_STATE_KEY = window.APP_SESSION_KEYS?.lineupPageState || "lineupPageState";
 
+// All possible positions plus // for when a player is on the bench
 const LINEUP_POSITIONS = ["//", "P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
+const LINEUP_GENERATE_MESSAGES = [
+    "Running smart lineup generation...",
+    "Reviewing the roster and position preferences...",
+    "Determing pitcher and catcher assignments...",
+    "Balancing innings, positions, and batting order..."
+];
 
 const lineupState = {
     currentLineup: null,
     draftLineup: null,
-    isEditing: false
+    isEditing: false,
+    draggedPlayerId: null
 };
 
 function getSettings() {
@@ -41,6 +50,13 @@ function getSettings() {
 
 function getPlayerId(player) {
     return player.player_id ?? player.id;
+}
+
+function getPlayerObject(player) {
+    return {
+        player_id: getPlayerId(player),
+        available_innings: [ 1,2,3,4,5,6,7,8,9 ] // TODO make this configurable per player
+    };
 }
 
 function getPlayerName(player, formatOverride) {
@@ -129,6 +145,86 @@ function saveRememberedRoster() {
     window.AppSettings?.saveSavedRosterIds?.(playerIds);
 }
 
+function persistLineupPageState() {
+    const nextState = {
+        selectedPlayerIds: rosterState.selectedPlayers.map((player) => String(getPlayerId(player))),
+        currentLineup: lineupState.currentLineup ? cloneData(lineupState.currentLineup) : null
+    };
+
+    try {
+        sessionStorage.setItem(LINEUP_PAGE_STATE_KEY, JSON.stringify(nextState));
+    } catch (error) {
+        console.debug("Unable to persist lineup page state:", error);
+    }
+}
+
+function getPersistedLineupPageState() {
+    try {
+        const rawState = sessionStorage.getItem(LINEUP_PAGE_STATE_KEY);
+        return rawState ? JSON.parse(rawState) : null;
+    } catch (error) {
+        console.debug("Unable to read lineup page state:", error);
+        return null;
+    }
+}
+
+function resolveSelectedPlayers(playerIds, lineup) {
+    const fallbackPlayers = Array.isArray(lineup?.players) ? lineup.players : [];
+
+    return playerIds.map((playerId) => {
+        return rosterState.allPlayers.find((player) => String(getPlayerId(player)) === String(playerId))
+            || fallbackPlayers.find((player) => String(getPlayerId(player)) === String(playerId));
+    }).filter(Boolean);
+}
+
+function resetRenderedLineupState() {
+    lineupState.currentLineup = null;
+    lineupState.draftLineup = null;
+    lineupState.isEditing = false;
+    lineupState.draggedPlayerId = null;
+    lineupResult.innerHTML = '<div class="text-muted">Generate a lineup to see results.</div>';
+    setLineupActionState();
+}
+
+function restorePersistedLineupPageState(savedState) {
+    if (!savedState) {
+        return false;
+    }
+
+    const savedLineup = savedState.currentLineup ? normalizeLineupPayload(cloneData(savedState.currentLineup)) : null;
+    const savedPlayerIds = Array.isArray(savedState.selectedPlayerIds) ? savedState.selectedPlayerIds : [];
+    const lineupPlayerIds = Array.isArray(savedLineup?.players)
+        ? savedLineup.players.map((player) => String(getPlayerId(player)))
+        : [];
+
+    rosterState.selectedPlayers = resolveSelectedPlayers(savedPlayerIds.length ? savedPlayerIds : lineupPlayerIds, savedLineup);
+    renderRoster();
+    renderPlayerOptions();
+
+    if (savedLineup) {
+        renderGeneratedLineup(savedLineup);
+    } else {
+        resetRenderedLineupState();
+    }
+
+    saveRememberedRoster();
+    return true;
+}
+
+async function loadLatestLineup() {
+    const response = await apiRequest("/latest_lineup");
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            return null;
+        }
+
+        throw new Error("Latest lineup request failed with status " + response.status + ".");
+    }
+
+    return await response.json();
+}
+
 function restoreRememberedRoster() {
     if (!getSettings().rememberRoster) {
         window.AppSettings?.clearSavedRoster?.();
@@ -179,6 +275,33 @@ function getLineupSource() {
     return lineupState.isEditing && lineupState.draftLineup
         ? lineupState.draftLineup
         : lineupState.currentLineup;
+}
+
+function getBattingOrder(player, fallbackOrder) {
+    const battingOrder = Number.parseInt(player?.batting_order, 10);
+    return Number.isNaN(battingOrder) ? fallbackOrder : battingOrder;
+}
+
+function normalizeLineupPayload(lineup) {
+    if (!lineup || !Array.isArray(lineup.players)) {
+        return lineup;
+    }
+
+    lineup.players = [...lineup.players]
+        .sort((firstPlayer, secondPlayer) => {
+            return getBattingOrder(firstPlayer, Number.MAX_SAFE_INTEGER) - getBattingOrder(secondPlayer, Number.MAX_SAFE_INTEGER);
+        })
+        .map((player, index) => {
+            player.batting_order = index + 1;
+
+            if (Array.isArray(player.innings)) {
+                player.innings = [...player.innings].sort((firstInning, secondInning) => firstInning.inning - secondInning.inning);
+            }
+
+            return player;
+        });
+
+    return lineup;
 }
 
 function buildLineupPositionOptions(selectedPosition) {
@@ -258,6 +381,7 @@ function addSelectedPlayer(playerId) {
     renderRoster();
     renderPlayerOptions();
     saveRememberedRoster();
+    persistLineupPageState();
     lineupStatus.textContent = getPlayerName(player) + " added to the roster.";
 }
 
@@ -290,7 +414,7 @@ function renderRoster() {
 
 function renderGeneratedLineup(lineup) {
     if (lineup) {
-        lineupState.currentLineup = cloneData(lineup);
+        lineupState.currentLineup = normalizeLineupPayload(cloneData(lineup));
     }
 
     const lineupSource = getLineupSource();
@@ -306,7 +430,7 @@ function renderGeneratedLineup(lineup) {
     }
 
     const inningNumbers = Array.from({ length: getSettings().inningsToDisplay }, (_, index) => index + 1);
-    const lineupRows = players.map((player) => {
+    const lineupRows = players.map((player, index) => {
         const playerId = String(getPlayerId(player)).replace(/"/g, "&quot;");
         const inningMap = new Map((player.innings || []).map((inningEntry) => [inningEntry.inning, inningEntry.position]));
         const inningCells = inningNumbers.map((inningNumber) => {
@@ -321,7 +445,15 @@ function renderGeneratedLineup(lineup) {
             return '<td class="text-center">' + position + '</td>';
         }).join("");
 
-        return '<tr><td class="fw-semibold">' + getPlayerName(player, getSettings().lineupNameFormat) + '</td>' + inningCells + '</tr>';
+        const rowAttributes = lineupState.isEditing
+            ? ' class="lineup-edit-row" draggable="true" data-player-id="' + playerId + '"'
+            : "";
+
+        const playerCellContent = lineupState.isEditing
+            ? '<span class="text-muted lineup-drag-handle" aria-hidden="true"><i class="fas fa-grip-vertical"></i></span>' + getPlayerName(player, getSettings().lineupNameFormat)
+            : getPlayerName(player, getSettings().lineupNameFormat);
+
+        return '<tr' + rowAttributes + '><td class="fw-semibold text-nowrap lineup-player-cell">' + playerCellContent + '</td>' + inningCells + '</tr>';
     }).join("");
 
     lineupResult.innerHTML =
@@ -335,7 +467,7 @@ function renderGeneratedLineup(lineup) {
             '<table class="table table-bordered table-striped align-middle mb-0">' +
                 '<thead>' +
                     '<tr>' +
-                        '<th>Player</th>' +
+                        '<th class="text-nowrap lineup-player-cell">Player</th>' +
                         inningNumbers.map((inningNumber) => '<th class="text-center">' + inningNumber + '</th>').join("") +
                     '</tr>' +
                 '</thead>' +
@@ -350,17 +482,63 @@ function beginLineupEdit() {
         return;
     }
 
-    lineupState.draftLineup = cloneData(lineupState.currentLineup);
+    lineupState.draftLineup = normalizeLineupPayload(cloneData(lineupState.currentLineup));
     lineupState.isEditing = true;
+    lineupState.draggedPlayerId = null;
     renderGeneratedLineup();
-    lineupStatus.textContent = "Editing lineup. Update positions, then save.";
+    lineupStatus.textContent = "Editing lineup. Update positions or drag rows to change batting order, then save.";
 }
 
 function cancelLineupEdit() {
     lineupState.draftLineup = null;
     lineupState.isEditing = false;
+    lineupState.draggedPlayerId = null;
     renderGeneratedLineup();
     lineupStatus.textContent = "Lineup edits discarded.";
+}
+
+function reorderDraftLineupPlayers(draggedPlayerId, targetPlayerId, placeAfter) {
+    if (!lineupState.draftLineup || !Array.isArray(lineupState.draftLineup.players) || !draggedPlayerId || !targetPlayerId || draggedPlayerId === targetPlayerId) {
+        return false;
+    }
+
+    const players = [...lineupState.draftLineup.players];
+    const draggedIndex = players.findIndex((player) => String(getPlayerId(player)) === draggedPlayerId);
+    const targetIndex = players.findIndex((player) => String(getPlayerId(player)) === targetPlayerId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+        return false;
+    }
+
+    const [draggedPlayer] = players.splice(draggedIndex, 1);
+    let nextIndex = targetIndex;
+
+    if (draggedIndex < targetIndex) {
+        nextIndex -= 1;
+    }
+
+    if (placeAfter) {
+        nextIndex += 1;
+    }
+
+    players.splice(nextIndex, 0, draggedPlayer);
+    lineupState.draftLineup.players = players.map((player, index) => {
+        player.batting_order = index + 1;
+        return player;
+    });
+    return true;
+}
+
+function clearLineupDropTargets() {
+    lineupResult.querySelectorAll(".lineup-edit-row").forEach((row) => {
+        row.classList.remove("lineup-drop-target", "lineup-drop-after", "dragging");
+        row.removeAttribute("data-drop-placement");
+    });
+}
+
+function getDropPlacement(targetRow, clientY) {
+    const rowBounds = targetRow.getBoundingClientRect();
+    return clientY > rowBounds.top + (rowBounds.height / 2) ? "after" : "before";
 }
 
 async function saveEditedLineup() {
@@ -372,7 +550,7 @@ async function saveEditedLineup() {
     lineupStatus.textContent = "Saving lineup...";
 
     try {
-        const response = await fetch(API_BASE_URL + "/edit_lineup", {
+        const response = await apiRequest("/edit_lineup", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(lineupState.draftLineup)
@@ -383,7 +561,7 @@ async function saveEditedLineup() {
 
             try {
                 const errorData = await response.json();
-                errorMessage = errorData.detail || errorMessage;
+                errorMessage = errorData.message || errorMessage;
             } catch (error) {
                 // Keep the fallback message if the error payload is not JSON.
             }
@@ -398,10 +576,12 @@ async function saveEditedLineup() {
             ? await response.json()
             : lineupState.draftLineup;
 
-        lineupState.currentLineup = cloneData(savedLineup);
+        lineupState.currentLineup = normalizeLineupPayload(cloneData(savedLineup));
         lineupState.draftLineup = null;
         lineupState.isEditing = false;
+        lineupState.draggedPlayerId = null;
         renderGeneratedLineup();
+        persistLineupPageState();
         lineupStatus.textContent = "Lineup saved.";
     } catch (error) {
         console.error("Error saving lineup:", error);
@@ -462,15 +642,41 @@ async function loadPlayers() {
     spinner.style.display = "block";
 
     try {
-        const response = await fetch(API_BASE_URL + "/players");
+        const response = await apiRequest("/players");
         const data = await response.json();
         rosterState.allPlayers = Array.isArray(data) ? data : (data.players || []);
+        const savedPageState = getPersistedLineupPageState();
 
-        const restoredSavedRoster = restoreRememberedRoster();
+        if (restorePersistedLineupPageState(savedPageState)) {
+            lineupStatus.textContent = (rosterState.selectedPlayers.length || lineupState.currentLineup)
+                ? "Restored your current lineup."
+                : "Players loaded.";
+            return;
+        }
+
+        const latestLineup = await loadLatestLineup();
+
+        if (latestLineup && Array.isArray(latestLineup.players) && latestLineup.players.length) {
+            rosterState.selectedPlayers = resolveSelectedPlayers(
+                latestLineup.players.map((player) => String(getPlayerId(player))),
+                latestLineup
+            );
+            renderRoster();
+            renderPlayerOptions();
+            renderGeneratedLineup(latestLineup);
+            saveRememberedRoster();
+            persistLineupPageState();
+            lineupStatus.textContent = "Loaded the most recent generated lineup.";
+            return;
+        }
+
+        rosterState.selectedPlayers = [];
         renderRoster();
         renderPlayerOptions();
+        resetRenderedLineupState();
+        persistLineupPageState();
         lineupStatus.textContent = rosterState.allPlayers.length
-            ? (restoredSavedRoster ? "Players loaded. Saved roster restored." : "Players loaded.")
+            ? "Players loaded."
             : "No players returned by the API.";
     } catch (error) {
         console.error("Error loading players:", error);
@@ -497,15 +703,24 @@ async function generateLineup() {
     const payload = {
         player_ids: rosterState.selectedPlayers.map((player) => getPlayerId(player))
     };
+    // const payload = {
+    //     game_date: document.getElementById("gameDateInput").value || null,
+    //     players: rosterState.selectedPlayers.map((player) => getPlayerObject(player))
+    // };
 
     lineupResult.innerHTML = '<div class="text-muted">Generating lineup...</div>';
     generatedLineupSection?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     try {
-        const response = await fetch(API_BASE_URL + "/generate_lineup", {
+        const response = await apiRequest("/generate_lineup", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
+        }, {
+            delayMs: 0,
+            title: "Generating Smart Lineup",
+            subtitle: "We are building the best lineup for this roster. This request make take a moment.",
+            messages: LINEUP_GENERATE_MESSAGES
         });
 
         if (!response.ok) {
@@ -515,7 +730,9 @@ async function generateLineup() {
         const data = await response.json();
         lineupState.draftLineup = null;
         lineupState.isEditing = false;
+        lineupState.draggedPlayerId = null;
         renderGeneratedLineup(data);
+        persistLineupPageState();
         lineupStatus.textContent = "Lineup generated.";
     } catch (error) {
         console.error("Error generating lineup:", error);
@@ -569,6 +786,7 @@ function handleRemovePlayerClick(event) {
     renderRoster();
     renderPlayerOptions();
     saveRememberedRoster();
+    persistLineupPageState();
     lineupStatus.textContent = "Player removed from the roster.";
 }
 
@@ -611,6 +829,84 @@ lineupResult.addEventListener("click", (event) => {
     beginLineupEdit();
 });
 
+lineupResult.addEventListener("dragstart", (event) => {
+    const targetRow = event.target.closest(".lineup-edit-row");
+
+    if (!targetRow || !lineupState.isEditing) {
+        return;
+    }
+
+    lineupState.draggedPlayerId = targetRow.getAttribute("data-player-id");
+    clearLineupDropTargets();
+    targetRow.classList.add("dragging");
+
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", lineupState.draggedPlayerId);
+    }
+});
+
+lineupResult.addEventListener("dragover", (event) => {
+    const targetRow = event.target.closest(".lineup-edit-row");
+
+    if (!targetRow || !lineupState.isEditing || !lineupState.draggedPlayerId) {
+        return;
+    }
+
+    const targetPlayerId = targetRow.getAttribute("data-player-id");
+
+    if (targetPlayerId === lineupState.draggedPlayerId) {
+        clearLineupDropTargets();
+        targetRow.classList.add("dragging");
+        return;
+    }
+
+    event.preventDefault();
+    const dropPlacement = getDropPlacement(targetRow, event.clientY);
+    clearLineupDropTargets();
+    targetRow.classList.add("lineup-drop-target");
+    targetRow.classList.toggle("lineup-drop-after", dropPlacement === "after");
+    targetRow.setAttribute("data-drop-placement", dropPlacement);
+
+    const draggedRow = lineupResult.querySelector('.lineup-edit-row[data-player-id="' + lineupState.draggedPlayerId + '"]');
+
+    if (draggedRow) {
+        draggedRow.classList.add("dragging");
+    }
+
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+    }
+});
+
+lineupResult.addEventListener("drop", (event) => {
+    const targetRow = event.target.closest(".lineup-edit-row");
+
+    if (!targetRow || !lineupState.isEditing || !lineupState.draggedPlayerId) {
+        return;
+    }
+
+    event.preventDefault();
+    const targetPlayerId = targetRow.getAttribute("data-player-id");
+    const placeAfter = targetRow.getAttribute("data-drop-placement") === "after";
+    const didReorder = reorderDraftLineupPlayers(lineupState.draggedPlayerId, targetPlayerId, placeAfter);
+
+    lineupState.draggedPlayerId = null;
+    clearLineupDropTargets();
+
+    if (!didReorder) {
+        return;
+    }
+
+    renderGeneratedLineup();
+    lineupStatus.textContent = "Batting order updated locally. Save to apply changes.";
+});
+
+lineupResult.addEventListener("dragend", () => {
+    lineupState.draggedPlayerId = null;
+    clearLineupDropTargets();
+});
+
 rosterTableBody.addEventListener("click", handleRemovePlayerClick);
 rosterMobileList.addEventListener("click", handleRemovePlayerClick);
 
@@ -623,6 +919,7 @@ clearRosterBtn.addEventListener("click", () => {
     renderPlayerOptions();
     saveRememberedRoster();
     downloadLineupBtn.disabled = true;
+    persistLineupPageState();
     lineupStatus.textContent = "Roster cleared.";
 });
 

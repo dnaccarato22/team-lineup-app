@@ -7,12 +7,12 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     spinner.style.display = "block";
 
     try {
-        const res = await fetch(API_BASE_URL+ "/login", {
+        const res = await apiRequest("/login", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 "username": username,
                 "password": password
             })
@@ -21,7 +21,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
             sessionStorage.setItem("loggedIn", "true");
             window.location.href = "lineup.html";
         } else {
-            const data = await res.json();x
+            const data = await res.json();
             alert("Login failed: " + data.message);
         }
     } catch (error) {

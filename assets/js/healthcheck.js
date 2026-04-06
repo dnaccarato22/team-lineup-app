@@ -28,10 +28,12 @@ async function warmApi(force) {
     setLastWarmupTime(now);
 
     try {
-        await fetch(API_BASE_URL + HEALTHCHECK_PATH, {
+        await apiRequest(HEALTHCHECK_PATH, {
             method: "GET",
             cache: "no-store",
             keepalive: true
+        }, {
+            showSlowOverlay: false
         });
     } catch (error) {
         console.debug("API warmup request failed:", error);

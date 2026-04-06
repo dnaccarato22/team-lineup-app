@@ -91,6 +91,34 @@
     min-width: 4.5rem;
 }
 
+.lineup-edit-row {
+    cursor: move;
+}
+
+.lineup-edit-row.dragging {
+    opacity: 0.55;
+}
+
+.lineup-edit-row.lineup-drop-target {
+    outline: 2px dashed #0d6efd;
+    outline-offset: -2px;
+}
+
+.lineup-edit-row.lineup-drop-after {
+    box-shadow: inset 0 -3px 0 #0d6efd;
+}
+
+.lineup-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.35rem;
+    cursor: grab;
+}
+
+.lineup-edit-row.dragging .lineup-drag-handle {
+    cursor: grabbing;
+}
+
 .lineup-edit-controls {
     display: flex;
     gap: 0.5rem;

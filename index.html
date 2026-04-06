@@ -26,6 +26,12 @@
                         <img class="brand" src="assets/img/app_logo.png" alt="app logo">
                     </div>
                     <h6 class="mb-4 text-muted">Login to your account</h6>
+                    <div id="spinner" class="text-center" style="display:none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                            <br>
+                        </div>
+                    </div>
                     <form id="loginForm" action="" method="">
                         <div class="mb-3 text-start">
                             <label for="username" class="form-label">Username</label>
@@ -41,11 +47,6 @@
                               <label class="form-check-label" for="check1">
                                 Remember me on this device
                               </label>
-                            </div>
-                        </div>
-                        <div id="spinner" class="text-center" style="display:none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-primary mb-4" style="width:100%">Login</button>

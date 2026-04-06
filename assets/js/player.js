@@ -301,12 +301,12 @@ function validateDraft(draft) {
     return true;
 }
 
-async function tryPlayerRequests(requests) {
+async function tryPlayerRequests(requests, feedbackOptions) {
     let lastError = new Error("The player request could not be completed.");
 
     for (const request of requests) {
         try {
-            const response = await fetch(API_BASE_URL + request.path, request.options);
+            const response = await apiRequest(request.path, request.options, request.feedbackOptions || feedbackOptions);
 
             if (response.ok) {
                 const contentType = response.headers.get("content-type") || "";
@@ -328,7 +328,7 @@ async function loadPlayers() {
     playerStatus.textContent = "Loading players...";
 
     try {
-        const response = await fetch(API_BASE_URL + "/players");
+        const response = await apiRequest("/players");
         const data = await response.json();
         playerState.players = Array.isArray(data) ? data : (data.players || []);
         playerStatus.textContent = playerState.players.length ? "Players loaded." : "No players returned by the API.";

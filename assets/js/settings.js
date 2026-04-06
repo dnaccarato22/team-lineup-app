@@ -85,7 +85,7 @@ async function refreshApiStatus() {
     apiStatusDetails.textContent = "Checking API health...";
 
     try {
-        const response = await fetch(API_BASE_URL + "/health", { cache: "no-store" });
+        const response = await apiRequest("/health", { cache: "no-store" });
 
         if (!response.ok) {
             throw new Error("Health check returned " + response.status + ".");
@@ -108,7 +108,7 @@ async function exportPlayers() {
     dataAdminStatus.textContent = "Exporting players...";
 
     try {
-        const response = await fetch(API_BASE_URL + "/players");
+        const response = await apiRequest("/players");
 
         if (!response.ok) {
             throw new Error("Export request failed with status " + response.status + ".");
@@ -166,7 +166,7 @@ async function importPlayers() {
             }
 
             try {
-                const response = await fetch(API_BASE_URL + "/add_player", {
+                const response = await apiRequest("/add_player", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)

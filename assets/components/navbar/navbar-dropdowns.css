@@ -8,6 +8,9 @@
     color: #B2EBF2;
     line-height: 1.42857;
     padding: 1rem 0 1rem 1rem !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
 }
 
 .nav-dropdown .nav-link:hover {
@@ -67,4 +70,8 @@
 
 .nav-dropdown .dropdown-divider {
     margin: 3px 0;
+}
+
+.nav-link-text {
+    display: inline-block;
 }

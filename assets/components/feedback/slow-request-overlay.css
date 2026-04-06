@@ -1,0 +1,66 @@
+.slow-request-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(15, 23, 42, 0.58);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 3000;
+}
+
+.slow-request-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.slow-request-card {
+    width: min(100%, 28rem);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    background: #ffffff;
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.22);
+    text-align: center;
+}
+
+.slow-request-spinner {
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto 1rem;
+    border: 0.28rem solid rgba(13, 110, 253, 0.15);
+    border-top-color: #0d6efd;
+    border-radius: 50%;
+    animation: slow-request-spin 0.8s linear infinite;
+}
+
+.slow-request-title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.slow-request-subtitle {
+    margin: 0.5rem 0 0;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.slow-request-message {
+    min-height: 1.75rem;
+    margin: 1rem 0 0;
+    font-weight: 600;
+    color: #0d6efd;
+}
+
+@keyframes slow-request-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

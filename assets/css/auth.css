@@ -18,6 +18,8 @@
 8. Adjustments to dafault behaviors
 -------------------------------------------------------------------*/
 
+@import "../components/feedback/slow-request-overlay.css";
+
 /*------------------------------------------------------------------
 [1. Body / #body]
 */

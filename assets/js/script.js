@@ -7,10 +7,15 @@
 (function() {
     'use strict';
 
-    // Toggle sidebar on Menu button click
-    $('#sidebarCollapse').on('click', function() {
-        $('#sidebar').toggleClass('active');
-        $('#body').toggleClass('active');
+    document.addEventListener("click", function(event) {
+        const sidebarToggle = event.target.closest("#sidebarCollapse");
+
+        if (!sidebarToggle) {
+            return;
+        }
+
+        document.getElementById("sidebar")?.classList.toggle("active");
+        document.getElementById("body")?.classList.toggle("active");
     });
 
     // Auto-hide sidebar on window resize if window size is small
@@ -20,4 +25,3 @@
     //     }
     // });
 })();
-
