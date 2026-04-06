@@ -62,8 +62,41 @@
         flex-direction: column;
     }
 
-    .lineup-action-buttons .btn,
-    .lineup-result-head #downloadLineupBtn {
+    .lineup-action-buttons .btn {
         width: 100%;
     }
+
+    .lineup-result-head {
+        align-items: flex-start;
+    }
+
+    .lineup-result-actions {
+        margin-left: auto;
+        justify-content: flex-end;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .lineup-result-actions .btn {
+        width: auto;
+        flex: 0 0 auto;
+    }
+
+    #downloadLineupBtn {
+        order: -1;
+    }
+}
+
+.lineup-position-select {
+    min-width: 4.5rem;
+}
+
+.lineup-edit-controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.lineup-edit-controls .btn {
+    flex: 0 0 auto;
 }

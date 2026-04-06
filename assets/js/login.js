@@ -1,5 +1,3 @@
-const API_BASE_URL = "https://team-lineup-api.onrender.com";
-
 document.getElementById("loginForm").addEventListener("submit", async function(e) {
     e.preventDefault();
 

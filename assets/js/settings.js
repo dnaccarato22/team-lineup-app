@@ -1,6 +1,4 @@
-const API_BASE_URL = "https://team-lineup-api.onrender.com";
 const POSITION_FIELDS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
-
 const settingsForm = document.getElementById("settingsForm");
 const playerNameFormatSelect = document.getElementById("playerNameFormat");
 const lineupNameFormatSelect = document.getElementById("lineupNameFormat");
@@ -8,7 +6,6 @@ const rememberRosterInput = document.getElementById("rememberRoster");
 const lineupSortOrderSelect = document.getElementById("lineupSortOrder");
 const inningsToDisplaySelect = document.getElementById("inningsToDisplay");
 const settingsStatus = document.getElementById("settingsStatus");
-
 const apiStatusBadge = document.getElementById("apiStatusBadge");
 const apiStatusDetails = document.getElementById("apiStatusDetails");
 const refreshApiStatusBtn = document.getElementById("refreshApiStatusBtn");

@@ -1,7 +1,4 @@
-const API_BASE_URL = "https://team-lineup-api.onrender.com";
-
 const POSITION_FIELDS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
-
 const playerSearchInput = document.getElementById("playerSearchInput");
 const addPlayerBtn = document.getElementById("addPlayerBtn");
 const playersTableBody = document.getElementById("playersTableBody");
