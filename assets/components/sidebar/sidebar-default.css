@@ -5,16 +5,24 @@
 * Website: https://github.com/alexis-luna/bootstrap-simple-admin-template
 -------------------------------------------------------------------*/
 #sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 250px;
     min-width: 250px;
     max-width: 250px;
     background: #fff;
     color: #fff;
-    transition: all 0.3s;
+    transition: transform 0.3s ease;
     border-right: 1px solid #e6ecf5;
+    box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.08);
+    overflow-y: auto;
+    z-index: 1040;
 }
 
 #sidebar.active {
-    margin-left: -250px;
+    transform: translateX(-100%);
 }
 
 #sidebar .sidebar-header {

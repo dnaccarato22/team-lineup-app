@@ -40,22 +40,41 @@
                 <div class="container">
                     <div class="row">
                         <div class="col-md-12 page-header">
-                            <div class="page-pretitle desktop-only">Generate Lineup</div>
-                            <h2 class="page-title desktop-only">Lineup</h2>
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                <div>
+                                    <div class="page-pretitle desktop-only">Generate Lineup</div>
+                                    <h2 class="page-title desktop-only">Lineup</h2>
+                                </div>
+                                <a href="information.html" class="page-info-link desktop-only" data-bs-toggle="tooltip" data-bs-placement="left" title="Learn how this works" aria-label="Learn how this works">
+                                    <i class="fas fa-info-circle"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="content">
-                                    <div class="head">
-                                        <h5 class="mb-0">Roster</h5>
-                                        <p class="text-muted desktop-only">Add players to the game</p>
-                                        <!-- TODO Add "lineupGameDateInput" that defaults to this coming Saturday -->
+                                    <div class="head d-flex justify-content-between align-items-start gap-3 flex-wrap lineup-roster-head">
+                                        <div class="lineup-roster-title-row">
+                                            <div>
+                                                <h5 class="mb-0">Roster</h5>
+                                                <p class="text-muted desktop-only">Add players to the game</p>
+                                            </div>
+                                            <a href="information.html" class="page-info-link d-md-none" data-bs-toggle="tooltip" data-bs-placement="left" title="Learn how this works" aria-label="Learn how this works">
+                                                <i class="fas fa-info-circle"></i>
+                                            </a>
+                                        </div>
+                                        <div class="lineup-roster-tools">
+                                            <div class="lineup-game-date-group">
+                                                <label for="gameDateInput" class="form-label mb-0">Game Date</label>
+                                                <input id="gameDateInput" type="date" class="form-control" aria-label="Game Date">
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="canvas-wrapper">
-                                        <div class="mb-3">
-                                            <label for="playerSearch" class="form-label">Available Players</label>
+                                        <div class="mb-3 lineup-player-field">
+                                            <label for="playerSearch" class="form-label mb-0">Available Players</label>
                                             <div class="d-flex gap-2 align-items-start lineup-player-picker">
                                                 <div class="position-relative flex-grow-1">
                                                     <input
@@ -63,6 +82,8 @@
                                                         type="search"
                                                         class="form-control"
                                                         placeholder="Select a player to add to the roster"
+                                                        data-mobile-placeholder="Select a player"
+                                                        data-desktop-placeholder="Select a player to add to the roster"
                                                         aria-label="Select or search available players"
                                                         autocomplete="off"
                                                     >
@@ -73,7 +94,6 @@
                                                 </select>
                                             </div>
                                             <div id="player_spinner" class="text-center" style="display:none;">
-                                                <br>
                                                 <div class="spinner-border text-primary" role="status">
                                                     <span class="visually-hidden">Loading...</span>
                                                 </div>
@@ -84,12 +104,13 @@
                                                 <thead class="success">
                                                     <tr>
                                                         <th>Player</th>
+                                                        <th>Innings</th>
                                                         <th class="text-end">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="rosterTableBody">
                                                     <tr>
-                                                        <td colspan="2" class="text-muted text-center">No players added yet.</td>
+                                                        <td colspan="3" class="text-muted text-center">No players added yet.</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
@@ -144,6 +165,27 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="availabilityModal" tabindex="-1" aria-labelledby="availabilityModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="availabilityModalLabel">Edit Available Innings</h5>
+                        <p id="availabilityModalSubtitle" class="text-muted mb-0"></p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Select the innings this player can attend.</p>
+                    <div id="availabilityCheckboxes" class="lineup-availability-grid"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelAvailabilityBtn" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button id="saveAvailabilityBtn" type="button" class="btn btn-primary">Save</button>
                 </div>
             </div>
         </div>

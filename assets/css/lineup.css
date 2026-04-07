@@ -3,12 +3,64 @@
         display: none !important;
     }
 
-    .lineup-player-picker {
+    .lineup-roster-head {
         flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .lineup-roster-title-row {
+        width: 100%;
+    }
+
+    .lineup-roster-tools {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .lineup-game-date-group {
+        width: auto;
+        max-width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-left: auto;
+    }
+
+    .lineup-game-date-group .form-label,
+    .lineup-player-field .form-label {
+        flex: 0 0 auto;
+        margin-bottom: 0;
+        white-space: nowrap;
+    }
+
+    .lineup-game-date-group .form-control,
+    .lineup-player-field .lineup-player-picker {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .lineup-game-date-group .form-control {
+        flex: 0 0 auto;
+        width: 11.25rem;
+        max-width: 100%;
+        margin-left: auto;
+    }
+
+    .lineup-player-field {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .lineup-player-picker {
+        flex-direction: row;
     }
 
     .lineup-player-picker > * {
-        width: 100%;
+        width: auto;
     }
 
     .lineup-mobile-roster-list {
@@ -49,6 +101,13 @@
         color: #656d77;
     }
 
+    .lineup-mobile-roster-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        margin-top: 0.75rem;
+    }
+
     .lineup-mobile-empty {
         padding: 1rem;
         border: 1px dashed #ced4da;
@@ -60,6 +119,7 @@
 
     .lineup-action-buttons {
         flex-direction: column;
+        border-top: 1px solid #e7eaf3;
     }
 
     .lineup-action-buttons .btn {
@@ -82,13 +142,85 @@
         flex: 0 0 auto;
     }
 
+    .lineup-result-actions .page-info-link {
+        order: -2;
+    }
+
     #downloadLineupBtn {
         order: -1;
+    }
+
+    #player_spinner {
+        flex: 0 0 100%;
+        width: 100%;
+        margin-top: 0.5rem;
+        text-align: center;
     }
 }
 
 .lineup-position-select {
     min-width: 4.5rem;
+}
+
+.lineup-game-date-group {
+    min-width: 13rem;
+}
+
+.lineup-roster-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.lineup-roster-tools {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.lineup-availability-summary {
+    font-weight: 600;
+    color: #495057;
+}
+
+.lineup-availability-summary.is-partial {
+    color: #0d6efd;
+}
+
+.lineup-availability-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.lineup-availability-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #dbe3ec;
+    border-radius: 0.85rem;
+    padding: 0.75rem;
+    background: #eef2f7;
+    color: #6c757d;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.lineup-availability-option:hover {
+    transform: translateY(-1px);
+}
+
+.lineup-availability-option.is-selected {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+.lineup-mobile-roster-actions {
+    display: flex;
+    gap: 0.5rem;
 }
 
 .lineup-edit-row {
@@ -113,6 +245,9 @@
     align-items: center;
     margin-right: 0.35rem;
     cursor: grab;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .lineup-edit-row.dragging .lineup-drag-handle {

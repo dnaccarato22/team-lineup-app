@@ -1,3 +1,180 @@
-<!-- # TODO an "Info" page with details about the app, how to use it, etc. Sections for "How lineup generation works" and "How to manage players". Explanations for the steps the 
-#   app takes to generate lineups, what fields are customizable, and what the different player position scores mean. This page should be added to the sidebar navigation with an (i) icon.
-#   Also add a link to this page in both the lineup and player pages with a tooltip that says "Learn how this works". -->
+<script>
+    if (sessionStorage.getItem("loggedIn") !== "true") {
+        window.location.href = "index.html";
+    }
+</script>
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Information | Smart Lineup Generator</title>
+    <link rel="icon" type="image/png" href="assets/img/app_logo.png">
+    <link href="assets/vendor/fontawesome/css/fontawesome.min.css" rel="stylesheet">
+    <link href="assets/vendor/fontawesome/css/solid.min.css" rel="stylesheet">
+    <link href="assets/vendor/fontawesome/css/brands.min.css" rel="stylesheet">
+    <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/master.css" rel="stylesheet">
+    <link href="assets/vendor/flagiconcss/css/flag-icon.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="wrapper">
+        <div data-shared-sidebar data-current-page="information"></div>
+        <div id="body" class="active">
+            <nav class="navbar navbar-expand-lg navbar-white bg-white">
+                <button type="button" id="sidebarCollapse" class="btn btn-light">
+                    <i class="fas fa-bars"></i><span></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="nav navbar-nav ms-auto" data-shared-account-menu></ul>
+                </div>
+            </nav>
+            <div class="content">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md-12 page-header">
+                            <div class="page-pretitle">Learn</div>
+                            <h2 class="page-title">How Smart Lineup Generator Works</h2>
+                        </div>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-8">
+                            <div class="card">
+                                <div class="content">
+                                    <div class="head">
+                                        <h5 class="mb-0">How Lineup Generation Works</h5>
+                                        <p class="text-muted">What the app looks at when building a lineup for your game.</p>
+                                    </div>
+                                    <div class="canvas-wrapper">
+                                        <ol class="mb-0 ps-3">
+                                            <li class="mb-3">The app starts with the roster you selected on the Lineup page, along with the game date and each player's available innings.</li>
+                                            <li class="mb-3">It looks at every player's position scores to understand where they prefer to play.</li>
+                                            <li class="mb-3">It start by assigning the game's pitchers. Players with higher pitching scores will be treated as starters, while lower scores will be treated as relievers.</li>
+                                            <li class="mb-3">It balances field assignments across innings so players are best placed where they prefer while still respecting even playing time.</li>
+                                            <li class="mb-3">It assigns a batting order according to the most recent lineup, but all of the positions and batting spots can be reviewed and edited.</li>
+                                            <li>If you make manual lineup edits, the app sends the updated lineup back to the API for validation before saving it.</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card mt-4">
+                                <div class="content">
+                                    <div class="head">
+                                        <h5 class="mb-0">What You Can Customize</h5>
+                                        <p class="text-muted">The main inputs that affect the generated lineup.</p>
+                                    </div>
+                                    <div class="canvas-wrapper">
+                                        <div class="mb-3">
+                                            <h6 class="mb-1">Roster Selection</h6>
+                                            <p class="text-muted mb-0">Only players added to the roster are considered for the generated lineup.</p>
+                                        </div>
+                                        <div class="mb-3">
+                                            <h6 class="mb-1">Game Date</h6>
+                                            <p class="text-muted mb-0">The Lineup page defaults to the upcoming Saturday, but you can change the date before generating a lineup.</p>
+                                        </div>
+                                        <div class="mb-3">
+                                            <h6 class="mb-1">Available Innings</h6>
+                                            <p class="text-muted mb-0">Each player can be marked for the full game or partial innings if they are arriving late or leaving early.</p>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1">Manual Lineup Editing</h6>
+                                            <p class="text-muted mb-0">After generation, you can drag players to change batting order and update inning positions before saving.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card mt-4">
+                                <div class="content">
+                                    <div class="head">
+                                        <h5 class="mb-0">How To Manage Players</h5>
+                                        <p class="text-muted">Best practices for keeping the player directory accurate.</p>
+                                    </div>
+                                    <div class="canvas-wrapper">
+                                        <ol class="mb-0 ps-3">
+                                            <li class="mb-3">Open the Players page to add new players, update existing ratings, or remove players who are no longer active.</li>
+                                            <li class="mb-3">When adding or editing a player, fill out each position score based on where they prefer to play.</li>
+                                            <li class="mb-3">Use the search field to quickly find players by first or last name.</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="card">
+                                <div class="content">
+                                    <div class="head">
+                                        <h5 class="mb-0">Position Scores</h5>
+                                        <p class="text-muted">What the position ratings mean for Players.</p>
+                                    </div>
+                                    <div class="canvas-wrapper">
+                                        <div class="mb-3">
+                                            <h6 class="mb-1">Score Range</h6>
+                                            <p class="text-muted mb-0">Position scores run from 0 to 5, where higher values are the highest preference.</p>
+                                        </div>
+                                        <div class="info-score-scale">
+                                            <div class="info-score-item">
+                                                <div class="info-score-number">0</div>
+                                                <div class="info-score-copy">
+                                                    <h6>No Assignment</h6>
+                                                    <p>A player will never be assigned to this position.</p>
+                                                </div>
+                                            </div>
+                                            <div class="info-score-item">
+                                                <div class="info-score-number">1</div>
+                                                <div class="info-score-copy">
+                                                    <h6>Emergency Option</h6>
+                                                    <p>The player is willing to play this position only if no one else is available.</p>
+                                                </div>
+                                            </div>
+                                            <div class="info-score-item">
+                                                <div class="info-score-number">2</div>
+                                                <div class="info-score-copy">
+                                                    <h6>Somewhat Comfortable</h6>
+                                                    <p>The player can handle the position, but it is not a strong preference.</p>
+                                                </div>
+                                            </div>
+                                            <div class="info-score-item">
+                                                <div class="info-score-number">3</div>
+                                                <div class="info-score-copy">
+                                                    <h6>Comfortable</h6>
+                                                    <p>The player is comfortable here and should be a dependable option.</p>
+                                                </div>
+                                            </div>
+                                            <div class="info-score-item">
+                                                <div class="info-score-number">4</div>
+                                                <div class="info-score-copy">
+                                                    <h6>Very Comfortable</h6>
+                                                    <p>The player is a strong fit for this spot and is usually a good choice there.</p>
+                                                </div>
+                                            </div>
+                                            <div class="info-score-item">
+                                                <div class="info-score-number">5</div>
+                                                <div class="info-score-copy">
+                                                    <h6>Top Preference</h6>
+                                                    <p>This is the player's most preferred position and where they should thrive most often.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="assets/js/config.js"></script>
+    <script src="assets/vendor/jquery/jquery.min.js"></script>
+    <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/shared-layout.js"></script>
+    <script src="assets/js/script.js"></script>
+    <script src="assets/api/healthcheck.js"></script>
+    <script src="assets/js/logout.js"></script>
+</body>
+
+</html>

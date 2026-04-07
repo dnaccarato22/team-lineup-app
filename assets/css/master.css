@@ -115,6 +115,61 @@ body {
     border-bottom: 1px solid rgba(101, 109, 119, .16);
 }
 
+.page-info-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    text-decoration: none;
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.page-info-link:hover,
+.page-info-link:focus {
+    color: #0d6efd;
+    transform: translateY(-1px);
+}
+
+.info-score-scale {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.info-score-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.9rem;
+    align-items: start;
+    padding: 0.9rem 1rem;
+    border: 1px solid #e5e9f2;
+    border-radius: 0.9rem;
+    background: #f8fafc;
+}
+
+.info-score-number {
+    min-width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #0d6efd;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.info-score-copy h6 {
+    margin: 0;
+}
+
+.info-score-copy p {
+    margin: 0.25rem 0 0;
+    color: #6c757d;
+}
+
 /*------------------------------------------------------------------
 [3. Navigation / #navbar] - see /components/navbar/navbar-dropdown.css
 */

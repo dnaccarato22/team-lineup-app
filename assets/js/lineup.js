@@ -17,6 +17,7 @@ const playerSelect = document.getElementById("playerSelect");
 const playerSearchDropdown = document.getElementById("playerSearchDropdown");
 const rosterTableBody = document.getElementById("rosterTableBody");
 const rosterMobileList = document.getElementById("rosterMobileList");
+const gameDateInput = document.getElementById("gameDateInput");
 const clearRosterBtn = document.getElementById("clearRosterBtn");
 const generateLineupBtn = document.getElementById("generateLineupBtn");
 const lineupEditControls = document.getElementById("lineupEditControls");
@@ -26,10 +27,15 @@ const downloadLineupBtn = document.getElementById("downloadLineupBtn");
 const lineupResult = document.getElementById("lineupResult");
 const lineupStatus = document.getElementById("lineupStatus");
 const generatedLineupSection = document.getElementById("generatedLineupSection");
+const availabilityModalElement = document.getElementById("availabilityModal");
+const availabilityModalSubtitle = document.getElementById("availabilityModalSubtitle");
+const availabilityCheckboxes = document.getElementById("availabilityCheckboxes");
+const saveAvailabilityBtn = document.getElementById("saveAvailabilityBtn");
 const LINEUP_PAGE_STATE_KEY = window.APP_SESSION_KEYS?.lineupPageState || "lineupPageState";
 
 // All possible positions plus // for when a player is on the bench
 const LINEUP_POSITIONS = ["//", "P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
+const FULL_GAME_INNINGS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const LINEUP_GENERATE_MESSAGES = [
     "Running smart lineup generation...",
     "Reviewing the roster and position preferences...",
@@ -41,8 +47,12 @@ const lineupState = {
     currentLineup: null,
     draftLineup: null,
     isEditing: false,
-    draggedPlayerId: null
+    draggedPlayerId: null,
+    availabilityPlayerId: null,
+    touchDragActive: false
 };
+
+const availabilityModal = availabilityModalElement ? new bootstrap.Modal(availabilityModalElement) : null;
 
 function getSettings() {
     return window.AppSettings?.getSettings ? window.AppSettings.getSettings() : fallbackSettings;
@@ -52,11 +62,99 @@ function getPlayerId(player) {
     return player.player_id ?? player.id;
 }
 
+function normalizeAvailableInnings(value) {
+    const innings = Array.isArray(value) ? value : FULL_GAME_INNINGS;
+
+    return [...new Set(innings
+        .map((inning) => Number.parseInt(inning, 10))
+        .filter((inning) => FULL_GAME_INNINGS.includes(inning)))]
+        .sort((firstInning, secondInning) => firstInning - secondInning);
+}
+
+function getUpcomingSaturdayDateValue() {
+    const today = new Date();
+    const nextSaturday = new Date(today);
+    const daysUntilSaturday = (6 - today.getDay() + 7) % 7;
+
+    nextSaturday.setDate(today.getDate() + daysUntilSaturday);
+    nextSaturday.setHours(0, 0, 0, 0);
+    return nextSaturday.toISOString().slice(0, 10);
+}
+
+function getCurrentGameDate() {
+    return gameDateInput?.value || getUpcomingSaturdayDateValue();
+}
+
+function setCurrentGameDate(value) {
+    if (!gameDateInput) {
+        return;
+    }
+
+    gameDateInput.value = value || getUpcomingSaturdayDateValue();
+}
+
+function updatePlayerSearchPlaceholder() {
+    if (!playerSearch) {
+        return;
+    }
+
+    const isMobileView = window.matchMedia("(max-width: 767.98px)").matches;
+    playerSearch.placeholder = isMobileView
+        ? (playerSearch.dataset.mobilePlaceholder || "Select a player")
+        : (playerSearch.dataset.desktopPlaceholder || "Select a player to add to the roster");
+}
+
+function getPrintableGameDateLabel(value) {
+    if (!value) {
+        return "";
+    }
+
+    const parsedDate = new Date(value + "T00:00:00");
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return value;
+    }
+
+    return parsedDate.toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric"
+    });
+}
+
+function getPlayerAvailableInnings(player) {
+    const innings = normalizeAvailableInnings(player?.available_innings);
+    return innings.length ? innings : FULL_GAME_INNINGS.slice();
+}
+
+function cloneRosterPlayer(player, availableInnings) {
+    return {
+        ...player,
+        player_id: getPlayerId(player),
+        available_innings: getPlayerAvailableInnings({
+            available_innings: availableInnings ?? player?.available_innings
+        })
+    };
+}
+
 function getPlayerObject(player) {
     return {
         player_id: getPlayerId(player),
-        available_innings: [ 1,2,3,4,5,6,7,8,9 ] // TODO make this configurable per player
+        available_innings: getPlayerAvailableInnings(player)
     };
+}
+
+function getAvailabilitySummary(player) {
+    return getPlayerAvailableInnings(player).length === FULL_GAME_INNINGS.length ? "Full Game" : "Partial";
+}
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 function getPlayerName(player, formatOverride) {
@@ -147,7 +245,11 @@ function saveRememberedRoster() {
 
 function persistLineupPageState() {
     const nextState = {
-        selectedPlayerIds: rosterState.selectedPlayers.map((player) => String(getPlayerId(player))),
+        gameDate: getCurrentGameDate(),
+        selectedPlayers: rosterState.selectedPlayers.map((player) => ({
+            player_id: String(getPlayerId(player)),
+            available_innings: getPlayerAvailableInnings(player)
+        })),
         currentLineup: lineupState.currentLineup ? cloneData(lineupState.currentLineup) : null
     };
 
@@ -177,6 +279,22 @@ function resolveSelectedPlayers(playerIds, lineup) {
     }).filter(Boolean);
 }
 
+function resolveRosterEntries(playerEntries, lineup) {
+    const fallbackPlayers = Array.isArray(lineup?.players) ? lineup.players : [];
+
+    return playerEntries.map((entry) => {
+        const playerId = String(entry.player_id ?? entry.id ?? "");
+        const matchingPlayer = rosterState.allPlayers.find((player) => String(getPlayerId(player)) === playerId)
+            || fallbackPlayers.find((player) => String(getPlayerId(player)) === playerId);
+
+        if (!matchingPlayer) {
+            return null;
+        }
+
+        return cloneRosterPlayer(matchingPlayer, entry.available_innings);
+    }).filter(Boolean);
+}
+
 function resetRenderedLineupState() {
     lineupState.currentLineup = null;
     lineupState.draftLineup = null;
@@ -192,12 +310,16 @@ function restorePersistedLineupPageState(savedState) {
     }
 
     const savedLineup = savedState.currentLineup ? normalizeLineupPayload(cloneData(savedState.currentLineup)) : null;
-    const savedPlayerIds = Array.isArray(savedState.selectedPlayerIds) ? savedState.selectedPlayerIds : [];
-    const lineupPlayerIds = Array.isArray(savedLineup?.players)
-        ? savedLineup.players.map((player) => String(getPlayerId(player)))
+    const savedPlayers = Array.isArray(savedState.selectedPlayers) ? savedState.selectedPlayers : [];
+    const lineupPlayers = Array.isArray(savedLineup?.players)
+        ? savedLineup.players.map((player) => ({
+            player_id: String(getPlayerId(player)),
+            available_innings: getPlayerAvailableInnings(player)
+        }))
         : [];
 
-    rosterState.selectedPlayers = resolveSelectedPlayers(savedPlayerIds.length ? savedPlayerIds : lineupPlayerIds, savedLineup);
+    setCurrentGameDate(savedState.gameDate);
+    rosterState.selectedPlayers = resolveRosterEntries(savedPlayers.length ? savedPlayers : lineupPlayers, savedLineup);
     renderRoster();
     renderPlayerOptions();
 
@@ -374,7 +496,7 @@ function addSelectedPlayer(playerId) {
         return;
     }
 
-    rosterState.selectedPlayers.push(player);
+    rosterState.selectedPlayers.push(cloneRosterPlayer(player));
     rosterState.searchTerm = "";
     playerSearch.value = "";
     playerSelect.value = "";
@@ -387,29 +509,119 @@ function addSelectedPlayer(playerId) {
 
 function renderRoster() {
     if (!rosterState.selectedPlayers.length) {
-        rosterTableBody.innerHTML = '<tr><td colspan="2" class="text-muted text-center">No players added yet.</td></tr>';
+        rosterTableBody.innerHTML = '<tr><td colspan="3" class="text-muted text-center">No players added yet.</td></tr>';
         rosterMobileList.innerHTML = '<div class="lineup-mobile-empty">No players added yet.</div>';
         return;
     }
 
     rosterTableBody.innerHTML = rosterState.selectedPlayers.map((player) => {
         const playerId = String(getPlayerId(player)).replace(/"/g, "&quot;");
-        return '<tr><td>' + getPlayerName(player) + '</td><td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" data-player-id="' + playerId + '">Remove</button></td></tr>';
+        const availabilitySummary = getAvailabilitySummary(player);
+        const summaryClass = availabilitySummary === "Full Game"
+            ? "lineup-availability-summary"
+            : "lineup-availability-summary is-partial";
+
+        return '<tr>' +
+            '<td>' + getPlayerName(player) + '</td>' +
+            '<td><span class="' + summaryClass + '">' + availabilitySummary + '</span></td>' +
+            '<td class="text-end text-nowrap">' +
+                '<button type="button" class="btn btn-sm btn-outline-primary edit-availability-btn" data-player-id="' + playerId + '">Edit Innings</button> ' +
+                '<button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" data-player-id="' + playerId + '">Remove</button>' +
+            '</td>' +
+        '</tr>';
     }).join("");
 
     rosterMobileList.innerHTML = rosterState.selectedPlayers.map((player) => {
         const playerId = String(getPlayerId(player)).replace(/"/g, "&quot;");
+        const availabilitySummary = getAvailabilitySummary(player);
 
         return '<div class="lineup-mobile-roster-card">' +
             '<div class="lineup-mobile-roster-header">' +
                 '<div>' +
                     '<h6 class="lineup-mobile-player-name">' + getPlayerName(player) + '</h6>' +
-                    '<p class="lineup-mobile-player-subtitle">Selected for this roster</p>' +
+                    '<p class="lineup-mobile-player-subtitle">' + availabilitySummary + '</p>' +
                 '</div>' +
+            '</div>' +
+            '<div class="lineup-mobile-roster-actions">' +
+                '<button type="button" class="btn btn-sm btn-outline-primary edit-availability-btn" data-player-id="' + playerId + '">Edit Innings</button>' +
                 '<button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" data-player-id="' + playerId + '">Remove</button>' +
             '</div>' +
         '</div>';
     }).join("");
+}
+
+function renderAvailabilityModal(player) {
+    if (!player || !availabilityCheckboxes) {
+        return;
+    }
+
+    const availableInnings = getPlayerAvailableInnings(player);
+    availabilityModalSubtitle.textContent = getPlayerName(player, "full");
+    availabilityCheckboxes.innerHTML = FULL_GAME_INNINGS.map((inningNumber) => {
+        const isSelected = availableInnings.includes(inningNumber);
+        const selectedClass = isSelected ? " is-selected" : "";
+        const pressedState = isSelected ? "true" : "false";
+
+        return '<button type="button" class="lineup-availability-option' + selectedClass + '" data-inning="' + inningNumber + '" aria-pressed="' + pressedState + '">' +
+            "Inning " + inningNumber +
+        '</button>';
+    }).join("");
+}
+
+function openAvailabilityModal(playerId) {
+    const player = rosterState.selectedPlayers.find((candidate) => String(getPlayerId(candidate)) === String(playerId));
+
+    if (!player || !availabilityModal) {
+        return;
+    }
+
+    lineupState.availabilityPlayerId = String(playerId);
+    renderAvailabilityModal(player);
+    availabilityModal.show();
+}
+
+function saveAvailabilityChanges() {
+    if (!lineupState.availabilityPlayerId) {
+        return;
+    }
+
+    const selectedInnings = Array.from(availabilityCheckboxes.querySelectorAll(".lineup-availability-option.is-selected"))
+        .map((option) => Number.parseInt(option.getAttribute("data-inning"), 10))
+        .filter((inning) => FULL_GAME_INNINGS.includes(inning))
+        .sort((firstInning, secondInning) => firstInning - secondInning);
+
+    if (!selectedInnings.length) {
+        lineupStatus.textContent = "Select at least one available inning for the player.";
+        return;
+    }
+
+    rosterState.selectedPlayers = rosterState.selectedPlayers.map((player) => {
+        if (String(getPlayerId(player)) !== lineupState.availabilityPlayerId) {
+            return player;
+        }
+
+        return {
+            ...player,
+            available_innings: selectedInnings
+        };
+    });
+
+    renderRoster();
+    saveRememberedRoster();
+    persistLineupPageState();
+    availabilityModal.hide();
+    lineupStatus.textContent = "Player inning availability updated.";
+}
+
+function toggleAvailabilityOption(event) {
+    const option = event.target.closest(".lineup-availability-option");
+
+    if (!option) {
+        return;
+    }
+
+    option.classList.toggle("is-selected");
+    option.setAttribute("aria-pressed", option.classList.contains("is-selected") ? "true" : "false");
 }
 
 function renderGeneratedLineup(lineup) {
@@ -541,6 +753,59 @@ function getDropPlacement(targetRow, clientY) {
     return clientY > rowBounds.top + (rowBounds.height / 2) ? "after" : "before";
 }
 
+function updateDraggedRowState(targetRow, clientY) {
+    if (!targetRow || !lineupState.isEditing || !lineupState.draggedPlayerId) {
+        return false;
+    }
+
+    const targetPlayerId = targetRow.getAttribute("data-player-id");
+
+    if (targetPlayerId === lineupState.draggedPlayerId) {
+        clearLineupDropTargets();
+        targetRow.classList.add("dragging");
+        return false;
+    }
+
+    const dropPlacement = getDropPlacement(targetRow, clientY);
+    clearLineupDropTargets();
+    targetRow.classList.add("lineup-drop-target");
+    targetRow.classList.toggle("lineup-drop-after", dropPlacement === "after");
+    targetRow.setAttribute("data-drop-placement", dropPlacement);
+
+    const draggedRow = lineupResult.querySelector('.lineup-edit-row[data-player-id="' + lineupState.draggedPlayerId + '"]');
+
+    if (draggedRow) {
+        draggedRow.classList.add("dragging");
+    }
+
+    return true;
+}
+
+function finishDraggedRowReorder(targetRow) {
+    if (!targetRow || !lineupState.isEditing || !lineupState.draggedPlayerId) {
+        lineupState.draggedPlayerId = null;
+        lineupState.touchDragActive = false;
+        clearLineupDropTargets();
+        return false;
+    }
+
+    const targetPlayerId = targetRow.getAttribute("data-player-id");
+    const placeAfter = targetRow.getAttribute("data-drop-placement") === "after";
+    const didReorder = reorderDraftLineupPlayers(lineupState.draggedPlayerId, targetPlayerId, placeAfter);
+
+    lineupState.draggedPlayerId = null;
+    lineupState.touchDragActive = false;
+    clearLineupDropTargets();
+
+    if (!didReorder) {
+        return false;
+    }
+
+    renderGeneratedLineup();
+    lineupStatus.textContent = "Batting order updated locally. Save to apply changes.";
+    return true;
+}
+
 async function saveEditedLineup() {
     if (!lineupState.isEditing || !lineupState.draftLineup) {
         return;
@@ -605,6 +870,9 @@ function downloadLineupPdf() {
         return;
     }
 
+    const printableGameDate = getPrintableGameDateLabel(getCurrentGameDate());
+    const printTitle = printableGameDate ? printableGameDate + " Lineup" : "Lineup";
+
     const printMarkup =
         '<!doctype html>' +
         '<html><head><title>lineup.pdf</title>' +
@@ -618,7 +886,7 @@ function downloadLineupPdf() {
             'th:first-child,td:first-child{text-align:left;}' +
             'thead th{background:#f8f9fa;}' +
         '</style></head><body>' +
-        '<h1>Lineup</h1>' +
+        '<h1>' + escapeHtml(printTitle) + '</h1>' +
         lineupTable.outerHTML +
         '<script>' +
             'window.addEventListener("load", function () {' +
@@ -645,6 +913,7 @@ async function loadPlayers() {
         const response = await apiRequest("/players");
         const data = await response.json();
         rosterState.allPlayers = Array.isArray(data) ? data : (data.players || []);
+        setCurrentGameDate(getUpcomingSaturdayDateValue());
         const savedPageState = getPersistedLineupPageState();
 
         if (restorePersistedLineupPageState(savedPageState)) {
@@ -657,8 +926,12 @@ async function loadPlayers() {
         const latestLineup = await loadLatestLineup();
 
         if (latestLineup && Array.isArray(latestLineup.players) && latestLineup.players.length) {
-            rosterState.selectedPlayers = resolveSelectedPlayers(
-                latestLineup.players.map((player) => String(getPlayerId(player))),
+            setCurrentGameDate(latestLineup.game_date);
+            rosterState.selectedPlayers = resolveRosterEntries(
+                latestLineup.players.map((player) => ({
+                    player_id: String(getPlayerId(player)),
+                    available_innings: getPlayerAvailableInnings(player)
+                })),
                 latestLineup
             );
             renderRoster();
@@ -701,12 +974,9 @@ async function generateLineup() {
     }
 
     const payload = {
-        player_ids: rosterState.selectedPlayers.map((player) => getPlayerId(player))
+        game_date: getCurrentGameDate(),
+        players: rosterState.selectedPlayers.map((player) => getPlayerObject(player))
     };
-    // const payload = {
-    //     game_date: document.getElementById("gameDateInput").value || null,
-    //     players: rosterState.selectedPlayers.map((player) => getPlayerObject(player))
-    // };
 
     lineupResult.innerHTML = '<div class="text-muted">Generating lineup...</div>';
     generatedLineupSection?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -790,6 +1060,16 @@ function handleRemovePlayerClick(event) {
     lineupStatus.textContent = "Player removed from the roster.";
 }
 
+function handleEditAvailabilityClick(event) {
+    const editButton = event.target.closest(".edit-availability-btn");
+
+    if (!editButton) {
+        return;
+    }
+
+    openAvailabilityModal(editButton.getAttribute("data-player-id"));
+}
+
 lineupResult.addEventListener("change", (event) => {
     const select = event.target.closest(".lineup-position-select");
 
@@ -853,26 +1133,8 @@ lineupResult.addEventListener("dragover", (event) => {
         return;
     }
 
-    const targetPlayerId = targetRow.getAttribute("data-player-id");
-
-    if (targetPlayerId === lineupState.draggedPlayerId) {
-        clearLineupDropTargets();
-        targetRow.classList.add("dragging");
-        return;
-    }
-
     event.preventDefault();
-    const dropPlacement = getDropPlacement(targetRow, event.clientY);
-    clearLineupDropTargets();
-    targetRow.classList.add("lineup-drop-target");
-    targetRow.classList.toggle("lineup-drop-after", dropPlacement === "after");
-    targetRow.setAttribute("data-drop-placement", dropPlacement);
-
-    const draggedRow = lineupResult.querySelector('.lineup-edit-row[data-player-id="' + lineupState.draggedPlayerId + '"]');
-
-    if (draggedRow) {
-        draggedRow.classList.add("dragging");
-    }
+    updateDraggedRowState(targetRow, event.clientY);
 
     if (event.dataTransfer) {
         event.dataTransfer.dropEffect = "move";
@@ -887,28 +1149,86 @@ lineupResult.addEventListener("drop", (event) => {
     }
 
     event.preventDefault();
-    const targetPlayerId = targetRow.getAttribute("data-player-id");
-    const placeAfter = targetRow.getAttribute("data-drop-placement") === "after";
-    const didReorder = reorderDraftLineupPlayers(lineupState.draggedPlayerId, targetPlayerId, placeAfter);
-
-    lineupState.draggedPlayerId = null;
-    clearLineupDropTargets();
-
-    if (!didReorder) {
-        return;
-    }
-
-    renderGeneratedLineup();
-    lineupStatus.textContent = "Batting order updated locally. Save to apply changes.";
+    finishDraggedRowReorder(targetRow);
 });
 
 lineupResult.addEventListener("dragend", () => {
     lineupState.draggedPlayerId = null;
+    lineupState.touchDragActive = false;
+    clearLineupDropTargets();
+});
+
+lineupResult.addEventListener("touchstart", (event) => {
+    const dragHandle = event.target.closest(".lineup-drag-handle");
+    const targetRow = dragHandle?.closest(".lineup-edit-row");
+
+    if (!targetRow || !lineupState.isEditing) {
+        return;
+    }
+
+    lineupState.draggedPlayerId = targetRow.getAttribute("data-player-id");
+    lineupState.touchDragActive = true;
+    clearLineupDropTargets();
+    targetRow.classList.add("dragging");
+}, { passive: true });
+
+lineupResult.addEventListener("touchmove", (event) => {
+    if (!lineupState.touchDragActive || !lineupState.draggedPlayerId) {
+        return;
+    }
+
+    const touch = event.touches[0];
+
+    if (!touch) {
+        return;
+    }
+
+    const targetRow = document.elementFromPoint(touch.clientX, touch.clientY)?.closest(".lineup-edit-row");
+
+    if (!targetRow) {
+        return;
+    }
+
+    event.preventDefault();
+    updateDraggedRowState(targetRow, touch.clientY);
+}, { passive: false });
+
+lineupResult.addEventListener("touchend", (event) => {
+    if (!lineupState.touchDragActive || !lineupState.draggedPlayerId) {
+        return;
+    }
+
+    const touch = event.changedTouches[0];
+    const targetRow = touch
+        ? document.elementFromPoint(touch.clientX, touch.clientY)?.closest(".lineup-edit-row")
+        : null;
+
+    finishDraggedRowReorder(targetRow);
+});
+
+lineupResult.addEventListener("touchcancel", () => {
+    lineupState.draggedPlayerId = null;
+    lineupState.touchDragActive = false;
     clearLineupDropTargets();
 });
 
 rosterTableBody.addEventListener("click", handleRemovePlayerClick);
+rosterTableBody.addEventListener("click", handleEditAvailabilityClick);
 rosterMobileList.addEventListener("click", handleRemovePlayerClick);
+rosterMobileList.addEventListener("click", handleEditAvailabilityClick);
+
+gameDateInput?.addEventListener("change", () => {
+    persistLineupPageState();
+    lineupStatus.textContent = "Game date updated.";
+});
+
+saveAvailabilityBtn?.addEventListener("click", saveAvailabilityChanges);
+availabilityCheckboxes?.addEventListener("click", toggleAvailabilityOption);
+
+availabilityModalElement?.addEventListener("hidden.bs.modal", () => {
+    lineupState.availabilityPlayerId = null;
+    availabilityCheckboxes.innerHTML = "";
+});
 
 clearRosterBtn.addEventListener("click", () => {
     rosterState.selectedPlayers = [];
@@ -927,4 +1247,6 @@ saveLineupBtn.addEventListener("click", saveEditedLineup);
 cancelLineupEditsBtn.addEventListener("click", cancelLineupEdit);
 generateLineupBtn.addEventListener("click", generateLineup);
 downloadLineupBtn.addEventListener("click", downloadLineupPdf);
+window.addEventListener("resize", updatePlayerSearchPlaceholder);
+updatePlayerSearchPlaceholder();
 loadPlayers();

@@ -18,6 +18,11 @@
         document.getElementById("body")?.classList.toggle("active");
     });
 
+    const tooltipElements = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipElements.forEach(function(element) {
+        new bootstrap.Tooltip(element);
+    });
+
     // Auto-hide sidebar on window resize if window size is small
     // $(window).on('resize', function () {
     //     if ($(window).width() <= 768) {

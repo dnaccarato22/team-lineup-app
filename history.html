@@ -1,2 +1,80 @@
-<!-- # TODO add a lineup history page that shows all lineups. They should be displayed in the same format as the generated lineup results but should be grouped by game_date. Each game_date group should be collapsible/expandable and should show the date and the number of lineups generated for that date. 
-#   This page should be added to the sidebar navigation with a clock/history icon. Also add a link to this page in the lineup page with a tooltip that says "View previous lineups". -->
+<script>
+    if (sessionStorage.getItem("loggedIn") !== "true") {
+        window.location.href = "index.html";
+    }
+</script>
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>History | Smart Lineup Generator</title>
+    <link rel="icon" type="image/png" href="assets/img/app_logo.png">
+    <link href="assets/vendor/fontawesome/css/fontawesome.min.css" rel="stylesheet">
+    <link href="assets/vendor/fontawesome/css/solid.min.css" rel="stylesheet">
+    <link href="assets/vendor/fontawesome/css/brands.min.css" rel="stylesheet">
+    <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/master.css" rel="stylesheet">
+    <link href="assets/css/history.css" rel="stylesheet">
+    <link href="assets/vendor/flagiconcss/css/flag-icon.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="wrapper">
+        <div data-shared-sidebar data-current-page="history"></div>
+        <div id="body" class="active">
+            <nav class="navbar navbar-expand-lg navbar-white bg-white">
+                <button type="button" id="sidebarCollapse" class="btn btn-light">
+                    <i class="fas fa-bars"></i><span></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="nav navbar-nav ms-auto" data-shared-account-menu></ul>
+                </div>
+            </nav>
+            <div class="content">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md-12 page-header">
+                            <div class="page-pretitle">Review</div>
+                            <h2 class="page-title">Lineup History</h2>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="content">
+                                    <div class="head">
+                                        <h5 class="mb-0">Saved Lineups</h5>
+                                        <p class="text-muted">Browse previous generated lineups grouped by game date.</p>
+                                    </div>
+                                    <div id="historyStatus" class="mb-3 text-muted">Loading lineup history...</div>
+                                    <div id="historyContent" class="canvas-wrapper">
+                                        <div class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="assets/js/config.js"></script>
+    <script src="assets/vendor/jquery/jquery.min.js"></script>
+    <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/shared-layout.js"></script>
+    <script src="assets/js/script.js"></script>
+    <script src="assets/api/healthcheck.js"></script>
+    <script src="assets/js/logout.js"></script>
+    <script src="assets/js/app-settings.js"></script>
+    <script src="assets/js/history.js"></script>
+</body>
+
+</html>
