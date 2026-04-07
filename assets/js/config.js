@@ -4,7 +4,33 @@ const SLOW_REQUEST_MESSAGE_INTERVAL_MS = 2400;
 const DEFAULT_SLOW_REQUEST_MESSAGES = [
     "Starting up server...",
     "Waiting for the API to respond...",
-    "Still working on your request..."
+    "Still working on your request...",
+    'Baseball is a game of patience, and so is this app...',
+    "Good things come to those who wait...",
+    "Choo Choo!",
+    "Is anyone actually reading these?",
+    "Sooo great weather we're having, huh?",
+    "Knock knock... Who's there?",
+    "Cold... Cold who?",
+    "Cold Start... get someone in the bullpen!",
+    "⚾...............",
+    ".⚾..............",
+    "..⚾.............",
+    "...⚾............",
+    "....⚾...........",
+    ".....⚾..........",
+    "......⚾.........",
+    ".......⚾........",
+    "........⚾.......",
+    ".........⚾......",
+    "..........⚾.....",
+    "...........⚾....",
+    "............⚾...",
+    ".............⚾..",
+    "..............⚾.",
+    "..............⚾🦇",
+    "Get it? It's a 'baseball bat' ⚾🦇.",
+    "Okay, I'll hush up now..."
 ];
 const APP_SESSION_KEYS = {
     lineupPageState: "lineupPageState"
