@@ -15,11 +15,9 @@
     <link rel="icon" type="image/png" href="assets/img/app_logo.png">
     <link href="assets/vendor/fontawesome/css/fontawesome.min.css" rel="stylesheet">
     <link href="assets/vendor/fontawesome/css/solid.min.css" rel="stylesheet">
-    <link href="assets/vendor/fontawesome/css/brands.min.css" rel="stylesheet">
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/master.css" rel="stylesheet">
     <link href="assets/css/lineup.css" rel="stylesheet">
-    <link href="assets/vendor/flagiconcss/css/flag-icon.min.css" rel="stylesheet">
 </head>
 
 <body>
@@ -81,9 +79,9 @@
                                                         id="playerSearch"
                                                         type="search"
                                                         class="form-control"
-                                                        placeholder="Select a player to add to the roster"
-                                                        data-mobile-placeholder="Select a player"
-                                                        data-desktop-placeholder="Select a player to add to the roster"
+                                                        placeholder="Select a player to add to this game"
+                                                        data-mobile-placeholder="Add player to this game"
+                                                        data-desktop-placeholder="Select a player to add to this game"
                                                         aria-label="Select or search available players"
                                                         autocomplete="off"
                                                     >
@@ -93,11 +91,6 @@
                                                     <option value="">Loading players...</option>
                                                 </select>
                                             </div>
-                                            <div id="player_spinner" class="text-center" style="display:none;">
-                                                <div class="spinner-border text-primary" role="status">
-                                                    <span class="visually-hidden">Loading...</span>
-                                                </div>
-                                            </div>
                                         </div>
                                         <div class="table-responsive d-none d-md-block">
                                             <table class="table table-striped align-middle">
@@ -105,18 +98,24 @@
                                                     <tr>
                                                         <th>Player</th>
                                                         <th>Innings</th>
+                                                        <th>Pitching</th>
                                                         <th class="text-end">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="rosterTableBody">
                                                     <tr>
-                                                        <td colspan="3" class="text-muted text-center">No players added yet.</td>
+                                                        <td colspan="4" class="text-muted text-center">No players added yet.</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
                                         <div id="rosterMobileList" class="d-block d-md-none lineup-mobile-roster-list">
                                             <div class="lineup-mobile-empty">No players added yet.</div>
+                                        </div>
+                                        <div id="player_spinner" class="text-center" style="display:none;">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
                                         </div>
                                         <div class="d-flex gap-2 lineup-action-buttons">
                                             <button id="generateLineupBtn" type="button" class="btn btn-success">Generate Lineup</button>
@@ -190,12 +189,33 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="pitchingModal" tabindex="-1" aria-labelledby="pitchingModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="pitchingModalLabel">Edit Pitching Eligibility</h5>
+                        <p id="pitchingModalSubtitle" class="text-muted mb-0"></p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Choose whether this player should pitch, should not pitch, or use the default setting.</p>
+                    <div id="pitchingOptions" class="lineup-pitching-grid"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelPitchingBtn" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button id="savePitchingBtn" type="button" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="assets/js/config.js"></script>
-    <script src="assets/vendor/jquery/jquery.min.js"></script>
     <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/shared-layout.js"></script>
     <script src="assets/js/script.js"></script>
-    <script src="assets/api/healthcheck.js"></script>
+    <script src="assets/js/back-to-top.js"></script>
+    <script src="assets/js/healthcheck.js"></script>
     <script src="assets/js/logout.js"></script>
     <script src="assets/js/app-settings.js"></script>
     <script src="assets/js/lineup.js"></script>

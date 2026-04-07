@@ -7,15 +7,46 @@
 (function() {
     'use strict';
 
-    document.addEventListener("click", function(event) {
-        const sidebarToggle = event.target.closest("#sidebarCollapse");
+    function getSidebarElements() {
+        return {
+            sidebar: document.getElementById("sidebar"),
+            body: document.getElementById("body")
+        };
+    }
 
-        if (!sidebarToggle) {
+    function isSidebarOpen(sidebar) {
+        return Boolean(sidebar) && !sidebar.classList.contains("active");
+    }
+
+    function setSidebarOpenState(isOpen) {
+        const { sidebar, body } = getSidebarElements();
+
+        if (!sidebar || !body) {
             return;
         }
 
-        document.getElementById("sidebar")?.classList.toggle("active");
-        document.getElementById("body")?.classList.toggle("active");
+        sidebar.classList.toggle("active", !isOpen);
+        body.classList.toggle("active", !isOpen);
+    }
+
+    document.addEventListener("click", function(event) {
+        const sidebarToggle = event.target.closest("#sidebarCollapse");
+        const { sidebar } = getSidebarElements();
+
+        if (sidebarToggle) {
+            setSidebarOpenState(!isSidebarOpen(sidebar));
+            return;
+        }
+
+        if (!isSidebarOpen(sidebar)) {
+            return;
+        }
+
+        if (event.target.closest("#sidebar")) {
+            return;
+        }
+
+        setSidebarOpenState(false);
     });
 
     const tooltipElements = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));

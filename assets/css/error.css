@@ -18,6 +18,8 @@
 /*------------------------------------------------------------------
 [1. Body / .wrapper]
 */
+@import "../components/feedback/back-to-top.css";
+
 @font-face {
     font-family: "Lato";
     font-style: normal;

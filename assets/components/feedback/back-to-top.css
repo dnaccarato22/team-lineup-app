@@ -1,0 +1,44 @@
+.back-to-top-btn {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 1030;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: #6c757d;
+    color: #fff;
+    box-shadow: 0 0.5rem 1.25rem rgba(108, 117, 125, 0.28);
+    font-weight: 700;
+    font-size: 1.1rem;
+    line-height: 1;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(0.75rem);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease, background-color 0.2s ease;
+}
+
+.back-to-top-btn:hover,
+.back-to-top-btn:focus {
+    background: #5c636a;
+    color: #fff;
+}
+
+.back-to-top-btn.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+@media (min-width: 768px) {
+    .back-to-top-btn {
+        display: none !important;
+    }
+}

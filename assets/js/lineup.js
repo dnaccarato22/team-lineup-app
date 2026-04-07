@@ -31,16 +31,42 @@ const availabilityModalElement = document.getElementById("availabilityModal");
 const availabilityModalSubtitle = document.getElementById("availabilityModalSubtitle");
 const availabilityCheckboxes = document.getElementById("availabilityCheckboxes");
 const saveAvailabilityBtn = document.getElementById("saveAvailabilityBtn");
+const pitchingModalElement = document.getElementById("pitchingModal");
+const pitchingModalSubtitle = document.getElementById("pitchingModalSubtitle");
+const pitchingOptions = document.getElementById("pitchingOptions");
+const savePitchingBtn = document.getElementById("savePitchingBtn");
 const LINEUP_PAGE_STATE_KEY = window.APP_SESSION_KEYS?.lineupPageState || "lineupPageState";
 
 // All possible positions plus // for when a player is on the bench
 const LINEUP_POSITIONS = ["//", "P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
 const FULL_GAME_INNINGS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const PITCHING_PREFERENCES = [
+    { value: "default", label: "Default" },
+    { value: "not_eligible", label: "Should NOT Pitch" },
+    { value: "required", label: "Should Pitch" }
+];
 const LINEUP_GENERATE_MESSAGES = [
     "Running smart lineup generation...",
     "Reviewing the roster and position preferences...",
     "Determing pitcher and catcher assignments...",
-    "Balancing innings, positions, and batting order..."
+    "Balancing innings, positions, and batting order...",
+    "Validating inning availability and position eligibility...",
+    "⚾...............",
+    ".⚾..............",
+    "..⚾.............",
+    "...⚾............",
+    "....⚾...........",
+    ".....⚾..........",
+    "......⚾.........",
+    ".......⚾........",
+    "........⚾.......",
+    ".........⚾......",
+    "..........⚾.....",
+    "...........⚾....",
+    "............⚾...",
+    ".............⚾..",
+    "..............⚾.",
+    "...............⚾",
 ];
 
 const lineupState = {
@@ -49,10 +75,12 @@ const lineupState = {
     isEditing: false,
     draggedPlayerId: null,
     availabilityPlayerId: null,
+    pitchingPlayerId: null,
     touchDragActive: false
 };
 
 const availabilityModal = availabilityModalElement ? new bootstrap.Modal(availabilityModalElement) : null;
+const pitchingModal = pitchingModalElement ? new bootstrap.Modal(pitchingModalElement) : null;
 
 function getSettings() {
     return window.AppSettings?.getSettings ? window.AppSettings.getSettings() : fallbackSettings;
@@ -100,8 +128,8 @@ function updatePlayerSearchPlaceholder() {
 
     const isMobileView = window.matchMedia("(max-width: 767.98px)").matches;
     playerSearch.placeholder = isMobileView
-        ? (playerSearch.dataset.mobilePlaceholder || "Select a player")
-        : (playerSearch.dataset.desktopPlaceholder || "Select a player to add to the roster");
+        ? (playerSearch.dataset.mobilePlaceholder || "Add player to this game")
+        : (playerSearch.dataset.desktopPlaceholder || "Select a player to add to this game");
 }
 
 function getPrintableGameDateLabel(value) {
@@ -127,12 +155,27 @@ function getPlayerAvailableInnings(player) {
     return innings.length ? innings : FULL_GAME_INNINGS.slice();
 }
 
+function normalizePitchingEligibility(value) {
+    if (value === true || value === false) {
+        return value;
+    }
+
+    return null;
+}
+
+function getPlayerPitchingEligibility(player) {
+    return normalizePitchingEligibility(player?.is_pitching);
+}
+
 function cloneRosterPlayer(player, availableInnings) {
     return {
         ...player,
         player_id: getPlayerId(player),
         available_innings: getPlayerAvailableInnings({
             available_innings: availableInnings ?? player?.available_innings
+        }),
+        is_pitching: getPlayerPitchingEligibility({
+            is_pitching: player?.is_pitching
         })
     };
 }
@@ -140,12 +183,41 @@ function cloneRosterPlayer(player, availableInnings) {
 function getPlayerObject(player) {
     return {
         player_id: getPlayerId(player),
-        available_innings: getPlayerAvailableInnings(player)
+        available_innings: getPlayerAvailableInnings(player),
+        is_pitching: getPlayerPitchingEligibility(player)
     };
 }
 
 function getAvailabilitySummary(player) {
     return getPlayerAvailableInnings(player).length === FULL_GAME_INNINGS.length ? "Full Game" : "Partial";
+}
+
+function getPitchingSummary(player) {
+    const pitchingEligibility = getPlayerPitchingEligibility(player);
+
+    if (pitchingEligibility === true) {
+        return "Pitching";
+    }
+
+    if (pitchingEligibility === false) {
+        return "Not Pitching";
+    }
+
+    return "Default";
+}
+
+function getPitchingSummaryClass(player) {
+    const pitchingEligibility = getPlayerPitchingEligibility(player);
+
+    if (pitchingEligibility === true) {
+        return "lineup-pitching-summary is-required";
+    }
+
+    if (pitchingEligibility === false) {
+        return "lineup-pitching-summary is-blocked";
+    }
+
+    return "lineup-pitching-summary";
 }
 
 function escapeHtml(value) {
@@ -248,7 +320,8 @@ function persistLineupPageState() {
         gameDate: getCurrentGameDate(),
         selectedPlayers: rosterState.selectedPlayers.map((player) => ({
             player_id: String(getPlayerId(player)),
-            available_innings: getPlayerAvailableInnings(player)
+            available_innings: getPlayerAvailableInnings(player),
+            is_pitching: getPlayerPitchingEligibility(player)
         })),
         currentLineup: lineupState.currentLineup ? cloneData(lineupState.currentLineup) : null
     };
@@ -291,7 +364,10 @@ function resolveRosterEntries(playerEntries, lineup) {
             return null;
         }
 
-        return cloneRosterPlayer(matchingPlayer, entry.available_innings);
+        return {
+            ...cloneRosterPlayer(matchingPlayer, entry.available_innings),
+            is_pitching: getPlayerPitchingEligibility(entry)
+        };
     }).filter(Boolean);
 }
 
@@ -314,7 +390,8 @@ function restorePersistedLineupPageState(savedState) {
     const lineupPlayers = Array.isArray(savedLineup?.players)
         ? savedLineup.players.map((player) => ({
             player_id: String(getPlayerId(player)),
-            available_innings: getPlayerAvailableInnings(player)
+            available_innings: getPlayerAvailableInnings(player),
+            is_pitching: getPlayerPitchingEligibility(player)
         }))
         : [];
 
@@ -459,7 +536,7 @@ function renderPlayerOptions() {
         return;
     }
 
-    playerSelect.innerHTML = '<option value="">Select a player</option>' + availablePlayers.map((player) => {
+    playerSelect.innerHTML = '<option value="">Add player to this game</option>' + availablePlayers.map((player) => {
         const playerId = String(getPlayerId(player)).replace(/"/g, "&quot;");
         const playerName = getPlayerName(player);
         return '<option value="' + playerId + '">' + playerName + '</option>';
@@ -509,7 +586,7 @@ function addSelectedPlayer(playerId) {
 
 function renderRoster() {
     if (!rosterState.selectedPlayers.length) {
-        rosterTableBody.innerHTML = '<tr><td colspan="3" class="text-muted text-center">No players added yet.</td></tr>';
+        rosterTableBody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">No players added yet.</td></tr>';
         rosterMobileList.innerHTML = '<div class="lineup-mobile-empty">No players added yet.</div>';
         return;
     }
@@ -520,12 +597,16 @@ function renderRoster() {
         const summaryClass = availabilitySummary === "Full Game"
             ? "lineup-availability-summary"
             : "lineup-availability-summary is-partial";
+        const pitchingSummary = getPitchingSummary(player);
+        const pitchingSummaryClass = getPitchingSummaryClass(player);
 
         return '<tr>' +
             '<td>' + getPlayerName(player) + '</td>' +
             '<td><span class="' + summaryClass + '">' + availabilitySummary + '</span></td>' +
+            '<td><span class="' + pitchingSummaryClass + '">' + pitchingSummary + '</span></td>' +
             '<td class="text-end text-nowrap">' +
                 '<button type="button" class="btn btn-sm btn-outline-primary edit-availability-btn" data-player-id="' + playerId + '">Edit Innings</button> ' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary edit-pitching-btn" data-player-id="' + playerId + '">Edit Pitching</button> ' +
                 '<button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" data-player-id="' + playerId + '">Remove</button>' +
             '</td>' +
         '</tr>';
@@ -534,16 +615,19 @@ function renderRoster() {
     rosterMobileList.innerHTML = rosterState.selectedPlayers.map((player) => {
         const playerId = String(getPlayerId(player)).replace(/"/g, "&quot;");
         const availabilitySummary = getAvailabilitySummary(player);
+        const pitchingSummary = getPitchingSummary(player);
 
         return '<div class="lineup-mobile-roster-card">' +
             '<div class="lineup-mobile-roster-header">' +
                 '<div>' +
                     '<h6 class="lineup-mobile-player-name">' + getPlayerName(player) + '</h6>' +
-                    '<p class="lineup-mobile-player-subtitle">' + availabilitySummary + '</p>' +
+                    '<p class="lineup-mobile-player-subtitle">Innings: ' + availabilitySummary + '</p>' +
+                    '<p class="lineup-mobile-player-subtitle">Pitching Eligibility: ' + pitchingSummary + '</p>' +
                 '</div>' +
             '</div>' +
             '<div class="lineup-mobile-roster-actions">' +
                 '<button type="button" class="btn btn-sm btn-outline-primary edit-availability-btn" data-player-id="' + playerId + '">Edit Innings</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary edit-pitching-btn" data-player-id="' + playerId + '">Edit Pitching</button>' +
                 '<button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" data-player-id="' + playerId + '">Remove</button>' +
             '</div>' +
         '</div>';
@@ -580,6 +664,38 @@ function openAvailabilityModal(playerId) {
     availabilityModal.show();
 }
 
+function renderPitchingModal(player) {
+    if (!player || !pitchingOptions) {
+        return;
+    }
+
+    const pitchingEligibility = getPlayerPitchingEligibility(player);
+    pitchingModalSubtitle.textContent = getPlayerName(player, "full");
+    pitchingOptions.innerHTML = PITCHING_PREFERENCES.map((option) => {
+        const isSelected = (option.value === "default" && pitchingEligibility === null)
+            || (option.value === "not_eligible" && pitchingEligibility === false)
+            || (option.value === "required" && pitchingEligibility === true);
+        const selectedClass = isSelected ? " is-selected" : "";
+        const pressedState = isSelected ? "true" : "false";
+
+        return '<button type="button" class="lineup-pitching-option' + selectedClass + '" data-pitching-value="' + option.value + '" aria-pressed="' + pressedState + '">' +
+            option.label +
+        '</button>';
+    }).join("");
+}
+
+function openPitchingModal(playerId) {
+    const player = rosterState.selectedPlayers.find((candidate) => String(getPlayerId(candidate)) === String(playerId));
+
+    if (!player || !pitchingModal) {
+        return;
+    }
+
+    lineupState.pitchingPlayerId = String(playerId);
+    renderPitchingModal(player);
+    pitchingModal.show();
+}
+
 function saveAvailabilityChanges() {
     if (!lineupState.availabilityPlayerId) {
         return;
@@ -613,6 +729,43 @@ function saveAvailabilityChanges() {
     lineupStatus.textContent = "Player inning availability updated.";
 }
 
+function savePitchingChanges() {
+    if (!lineupState.pitchingPlayerId) {
+        return;
+    }
+
+    const selectedOption = pitchingOptions?.querySelector(".lineup-pitching-option.is-selected");
+
+    if (!selectedOption) {
+        lineupStatus.textContent = "Select a pitching eligibility option for the player.";
+        return;
+    }
+
+    const selectedValue = selectedOption.getAttribute("data-pitching-value");
+    const nextPitchingValue = selectedValue === "required"
+        ? true
+        : selectedValue === "not_eligible"
+            ? false
+            : null;
+
+    rosterState.selectedPlayers = rosterState.selectedPlayers.map((player) => {
+        if (String(getPlayerId(player)) !== lineupState.pitchingPlayerId) {
+            return player;
+        }
+
+        return {
+            ...player,
+            is_pitching: nextPitchingValue
+        };
+    });
+
+    renderRoster();
+    saveRememberedRoster();
+    persistLineupPageState();
+    pitchingModal.hide();
+    lineupStatus.textContent = "Player pitching eligibility updated.";
+}
+
 function toggleAvailabilityOption(event) {
     const option = event.target.closest(".lineup-availability-option");
 
@@ -622,6 +775,20 @@ function toggleAvailabilityOption(event) {
 
     option.classList.toggle("is-selected");
     option.setAttribute("aria-pressed", option.classList.contains("is-selected") ? "true" : "false");
+}
+
+function togglePitchingOption(event) {
+    const option = event.target.closest(".lineup-pitching-option");
+
+    if (!option || !pitchingOptions) {
+        return;
+    }
+
+    pitchingOptions.querySelectorAll(".lineup-pitching-option").forEach((candidate) => {
+        const isSelected = candidate === option;
+        candidate.classList.toggle("is-selected", isSelected);
+        candidate.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    });
 }
 
 function renderGeneratedLineup(lineup) {
@@ -930,7 +1097,8 @@ async function loadPlayers() {
             rosterState.selectedPlayers = resolveRosterEntries(
                 latestLineup.players.map((player) => ({
                     player_id: String(getPlayerId(player)),
-                    available_innings: getPlayerAvailableInnings(player)
+                    available_innings: getPlayerAvailableInnings(player),
+                    is_pitching: getPlayerPitchingEligibility(player)
                 })),
                 latestLineup
             );
@@ -1068,6 +1236,16 @@ function handleEditAvailabilityClick(event) {
     }
 
     openAvailabilityModal(editButton.getAttribute("data-player-id"));
+}
+
+function handleEditPitchingClick(event) {
+    const editButton = event.target.closest(".edit-pitching-btn");
+
+    if (!editButton) {
+        return;
+    }
+
+    openPitchingModal(editButton.getAttribute("data-player-id"));
 }
 
 lineupResult.addEventListener("change", (event) => {
@@ -1214,8 +1392,10 @@ lineupResult.addEventListener("touchcancel", () => {
 
 rosterTableBody.addEventListener("click", handleRemovePlayerClick);
 rosterTableBody.addEventListener("click", handleEditAvailabilityClick);
+rosterTableBody.addEventListener("click", handleEditPitchingClick);
 rosterMobileList.addEventListener("click", handleRemovePlayerClick);
 rosterMobileList.addEventListener("click", handleEditAvailabilityClick);
+rosterMobileList.addEventListener("click", handleEditPitchingClick);
 
 gameDateInput?.addEventListener("change", () => {
     persistLineupPageState();
@@ -1224,10 +1404,17 @@ gameDateInput?.addEventListener("change", () => {
 
 saveAvailabilityBtn?.addEventListener("click", saveAvailabilityChanges);
 availabilityCheckboxes?.addEventListener("click", toggleAvailabilityOption);
+savePitchingBtn?.addEventListener("click", savePitchingChanges);
+pitchingOptions?.addEventListener("click", togglePitchingOption);
 
 availabilityModalElement?.addEventListener("hidden.bs.modal", () => {
     lineupState.availabilityPlayerId = null;
     availabilityCheckboxes.innerHTML = "";
+});
+
+pitchingModalElement?.addEventListener("hidden.bs.modal", () => {
+    lineupState.pitchingPlayerId = null;
+    pitchingOptions.innerHTML = "";
 });
 
 clearRosterBtn.addEventListener("click", () => {

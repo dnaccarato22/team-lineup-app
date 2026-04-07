@@ -8,6 +8,7 @@
 @import "../components/navbar/navbar-dropdowns.css";
 @import "../components/sidebar/sidebar-default.css";
 @import "../components/feedback/slow-request-overlay.css";
+@import "../components/feedback/back-to-top.css";
 
 /*------------------------------------------------------------------
 # [Color codes]

@@ -19,6 +19,7 @@
 -------------------------------------------------------------------*/
 
 @import "../components/feedback/slow-request-overlay.css";
+@import "../components/feedback/back-to-top.css";
 
 /*------------------------------------------------------------------
 [1. Body / #body]
