@@ -1,10 +1,12 @@
 const POSITION_FIELDS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
 const playerSearchInput = document.getElementById("playerSearchInput");
 const addPlayerBtn = document.getElementById("addPlayerBtn");
+const playersTable = document.getElementById("playersTable");
 const playersTableBody = document.getElementById("playersTableBody");
 const playersMobileList = document.getElementById("playersMobileList");
 const playerStatus = document.getElementById("playerStatus");
 const playerSpinner = document.getElementById("player_spinner");
+const playerSortHeaders = Array.from(document.querySelectorAll(".player-sort-header"));
 
 const playerState = {
     players: [],
@@ -12,7 +14,11 @@ const playerState = {
     editingPlayerId: null,
     editDraft: null,
     isAdding: false,
-    newPlayerDraft: null
+    newPlayerDraft: null,
+    desktopSort: {
+        position: null,
+        direction: "desc"
+    }
 };
 
 function getPlayerId(player) {
@@ -120,6 +126,93 @@ function getFilteredPlayers() {
     });
 }
 
+function compareText(leftValue, rightValue) {
+    return String(leftValue || "").localeCompare(String(rightValue || ""), undefined, { sensitivity: "base" });
+}
+
+function getDesktopSortedPlayers(players) {
+    const { position, direction } = playerState.desktopSort;
+
+    if (!position) {
+        return players.slice();
+    }
+
+    const directionMultiplier = direction === "asc" ? 1 : -1;
+
+    return players
+        .map((player, index) => ({ player, index }))
+        .sort((leftEntry, rightEntry) => {
+            const leftScore = getPositionValue(leftEntry.player, position);
+            const rightScore = getPositionValue(rightEntry.player, position);
+            const scoreComparison = (leftScore - rightScore) * directionMultiplier;
+
+            if (scoreComparison !== 0) {
+                return scoreComparison;
+            }
+
+            const lastNameComparison = compareText(leftEntry.player.last_name, rightEntry.player.last_name);
+
+            if (lastNameComparison !== 0) {
+                return lastNameComparison;
+            }
+
+            const firstNameComparison = compareText(leftEntry.player.first_name, rightEntry.player.first_name);
+
+            if (firstNameComparison !== 0) {
+                return firstNameComparison;
+            }
+
+            return leftEntry.index - rightEntry.index;
+        })
+        .map((entry) => entry.player);
+}
+
+function updateDesktopSortIndicators() {
+    playerSortHeaders.forEach((header) => {
+        const position = header.getAttribute("data-position");
+        const button = header.querySelector(".player-sort-btn");
+        const indicator = header.querySelector(".player-sort-indicator");
+        const isActive = playerState.desktopSort.position === position;
+        const sortDirection = isActive ? playerState.desktopSort.direction : "none";
+
+        header.setAttribute(
+            "aria-sort",
+            sortDirection === "asc" ? "ascending" : (sortDirection === "desc" ? "descending" : "none")
+        );
+
+        if (button) {
+            button.classList.toggle("is-active", isActive);
+            button.setAttribute("aria-pressed", isActive ? "true" : "false");
+            button.setAttribute(
+                "aria-label",
+                isActive
+                    ? "Sort by " + position + " score, currently " + (sortDirection === "asc" ? "ascending" : "descending")
+                    : "Sort by " + position + " score"
+            );
+        }
+
+        if (indicator) {
+            indicator.className = "fas player-sort-indicator " +
+                (sortDirection === "asc" ? "fa-sort-up" : (sortDirection === "desc" ? "fa-sort-down" : "fa-sort"));
+        }
+    });
+}
+
+function toggleDesktopSort(position) {
+    if (!POSITION_FIELDS.includes(position)) {
+        return;
+    }
+
+    if (playerState.desktopSort.position === position) {
+        playerState.desktopSort.direction = playerState.desktopSort.direction === "desc" ? "asc" : "desc";
+    } else {
+        playerState.desktopSort.position = position;
+        playerState.desktopSort.direction = "desc";
+    }
+
+    renderPlayers();
+}
+
 function buildScoreOptions(selectedValue) {
     return Array.from({ length: 6 }, (_, score) => {
         const selectedAttribute = Number(selectedValue) === score ? ' selected' : "";
@@ -128,14 +221,18 @@ function buildScoreOptions(selectedValue) {
 }
 
 function renderValueCell(value) {
-    return '<td class="text-center">' + escapeHtml(value) + "</td>";
+    return '<td class="text-center player-score-cell">' + escapeHtml(value) + "</td>";
 }
 
 function renderEditableCell(playerKey, fieldName, type, value) {
-    const inputClass = type === "number" ? "form-control form-control-sm text-center" : "form-control form-control-sm";
-    const minAttr = type === "number" ? ' min="0" max="5"' : "";
+    const isScoreField = type === "number";
+    const cellClass = isScoreField ? ' class="player-score-cell"' : "";
+    const inputClass = isScoreField
+        ? "form-control form-control-sm text-center player-score-input"
+        : "form-control form-control-sm";
+    const minAttr = isScoreField ? ' min="0" max="5" step="1" inputmode="numeric"' : "";
 
-    return '<td>' +
+    return "<td" + cellClass + ">" +
         '<input type="' + type + '" class="' + inputClass + ' player-field-input" data-player-key="' + escapeHtml(playerKey) + '" data-field="' + escapeHtml(fieldName) + '" value="' + escapeHtml(value) + '"' + minAttr + ">" +
         "</td>";
 }
@@ -247,6 +344,7 @@ function renderMobileReadOnlyCard(player) {
 
 function renderPlayers() {
     const filteredPlayers = getFilteredPlayers();
+    const desktopPlayers = getDesktopSortedPlayers(filteredPlayers);
     const tableRows = [];
     const mobileCards = [];
 
@@ -255,27 +353,38 @@ function renderPlayers() {
         mobileCards.push(renderMobileEditableCard("new", playerState.newPlayerDraft, true));
     }
 
-    filteredPlayers.forEach((player) => {
+    desktopPlayers.forEach((player) => {
         const playerId = String(getPlayerId(player));
 
         if (playerState.editingPlayerId === playerId && playerState.editDraft) {
             tableRows.push(renderEditableRow(playerId, playerState.editDraft, false));
-            mobileCards.push(renderMobileEditableCard(playerId, playerState.editDraft, false));
             return;
         }
 
         tableRows.push(renderReadOnlyRow(player));
+    });
+
+    filteredPlayers.forEach((player) => {
+        const playerId = String(getPlayerId(player));
+
+        if (playerState.editingPlayerId === playerId && playerState.editDraft) {
+            mobileCards.push(renderMobileEditableCard(playerId, playerState.editDraft, false));
+            return;
+        }
+
         mobileCards.push(renderMobileReadOnlyCard(player));
     });
 
     if (!tableRows.length) {
         playersTableBody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No players found.</td></tr>';
         playersMobileList.innerHTML = '<div class="player-mobile-empty">No players found.</div>';
+        updateDesktopSortIndicators();
         return;
     }
 
     playersTableBody.innerHTML = tableRows.join("");
     playersMobileList.innerHTML = mobileCards.join("");
+    updateDesktopSortIndicators();
 }
 
 function resetEditingState() {
@@ -536,6 +645,16 @@ function handlePlayerActionClick(event) {
     }
 }
 
+function handlePlayersTableClick(event) {
+    const sortButton = event.target.closest(".player-sort-btn");
+
+    if (!sortButton) {
+        return;
+    }
+
+    toggleDesktopSort(sortButton.getAttribute("data-sort-position"));
+}
+
 addPlayerBtn.addEventListener("click", () => {
     resetEditingState();
     playerState.isAdding = true;
@@ -554,5 +673,9 @@ playerSearchInput.addEventListener("input", (event) => {
     container.addEventListener("change", handlePlayerFieldInput);
     container.addEventListener("click", handlePlayerActionClick);
 });
+
+if (playersTable) {
+    playersTable.addEventListener("click", handlePlayersTableClick);
+}
 
 loadPlayers();

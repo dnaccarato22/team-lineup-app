@@ -81,20 +81,65 @@
                                             </div>
                                         </div>
                                         <div class="table-responsive d-none d-md-block">
-                                            <table class="table table-bordered table-striped align-middle">
+                                            <table id="playersTable" class="table table-bordered table-striped align-middle">
                                                 <thead>
                                                     <tr>
                                                         <th>First Name</th>
                                                         <th>Last Name</th>
-                                                        <th class="text-center">P</th>
-                                                        <th class="text-center">C</th>
-                                                        <th class="text-center">1B</th>
-                                                        <th class="text-center">2B</th>
-                                                        <th class="text-center">3B</th>
-                                                        <th class="text-center">SS</th>
-                                                        <th class="text-center">LF</th>
-                                                        <th class="text-center">CF</th>
-                                                        <th class="text-center">RF</th>
+                                                        <th class="text-center player-sort-header" data-position="P" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="P">
+                                                                <span>P</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="C" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="C">
+                                                                <span>C</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="1B" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="1B">
+                                                                <span>1B</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="2B" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="2B">
+                                                                <span>2B</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="3B" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="3B">
+                                                                <span>3B</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="SS" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="SS">
+                                                                <span>SS</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="LF" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="LF">
+                                                                <span>LF</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="CF" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="CF">
+                                                                <span>CF</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
+                                                        <th class="text-center player-sort-header" data-position="RF" aria-sort="none">
+                                                            <button type="button" class="player-sort-btn" data-sort-position="RF">
+                                                                <span>RF</span>
+                                                                <i class="fas fa-sort player-sort-indicator" aria-hidden="true"></i>
+                                                            </button>
+                                                        </th>
                                                         <th class="text-end">Actions</th>
                                                     </tr>
                                                 </thead>
