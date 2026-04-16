@@ -1088,7 +1088,7 @@ async function loadPlayersForNewLineups() {
         historyState.allPlayers = data;
     } catch (error) {
         console.error("Error loading players for history add flow:", error);
-        historyState.allPlayers = [];
+        // historyState.allPlayers = [];
     } finally {
         historyState.isLoadingPlayers = false;
         updateAddLineupButtonState();
@@ -1335,5 +1335,5 @@ historyContent.addEventListener("touchcancel", () => {
 
 addLineupBtn?.addEventListener("click", startNewHistoryLineup);
 
-loadPlayersForNewLineups();
+// loadPlayersForNewLineups();
 loadHistory();
