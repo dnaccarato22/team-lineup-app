@@ -64,6 +64,14 @@
     margin-top: 1rem;
 }
 
+.history-editor-card {
+    border: 1px solid #dbe3ec;
+    border-radius: 0.95rem;
+    background: #fff;
+    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.04);
+    margin-bottom: 1rem;
+}
+
 .history-lineup-meta {
     display: flex;
     align-items: center;
@@ -77,4 +85,93 @@
 .history-lineup-table td:first-child {
     text-align: left;
     white-space: nowrap;
+}
+
+.history-lineup-editor-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.history-lineup-editor-fields {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.history-lineup-editor-fields .form-label {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.history-lineup-editor-fields .form-control {
+    width: auto;
+    min-width: 12rem;
+}
+
+.history-lineup-position-cell {
+    min-width: 4.75rem;
+}
+
+.history-lineup-position-input {
+    min-width: 4.25rem;
+}
+
+.history-lineup-position-cell.is-invalid {
+    background-color: #f8d7da;
+}
+
+.history-lineup-position-cell.is-invalid .history-lineup-position-input {
+    border-color: #dc3545;
+    background-color: #fff5f5;
+}
+
+.history-lineup-edit-row {
+    cursor: move;
+}
+
+.history-lineup-edit-row.dragging {
+    opacity: 0.55;
+}
+
+.history-lineup-edit-row.history-lineup-drop-target {
+    outline: 2px dashed #0d6efd;
+    outline-offset: -2px;
+}
+
+.history-lineup-edit-row.history-lineup-drop-after {
+    box-shadow: inset 0 -3px 0 #0d6efd;
+}
+
+.history-lineup-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.35rem;
+    cursor: grab;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.history-lineup-edit-row.dragging .history-lineup-drag-handle {
+    cursor: grabbing;
+}
+
+@media (max-width: 767.98px) {
+    .history-lineup-editor-fields {
+        align-items: stretch;
+    }
+
+    .history-lineup-editor-fields .form-control {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .history-lineup-editor-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
 }

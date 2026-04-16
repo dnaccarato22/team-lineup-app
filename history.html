@@ -45,8 +45,15 @@
                             <div class="card">
                                 <div class="content">
                                     <div class="head">
-                                        <h5 class="mb-0">Saved Lineups</h5>
-                                        <p class="text-muted">Browse previous generated lineups grouped by game date.</p>
+                                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                            <div>
+                                                <h5 class="mb-0">Saved Lineups</h5>
+                                                <p class="text-muted">Browse previous generated lineups grouped by game date.</p>
+                                            </div>
+                                            <button id="addLineupBtn" type="button" class="btn btn-primary" disabled>
+                                                <i class="fas fa-plus"></i> Add Lineup
+                                            </button>
+                                        </div>
                                     </div>
                                     <div id="historyStatus" class="mb-3 text-muted">Loading lineup history...</div>
                                     <div id="historyContent" class="canvas-wrapper">
@@ -73,6 +80,19 @@
     <script src="assets/js/logout.js"></script>
     <script src="assets/js/app-settings.js"></script>
     <script src="assets/js/history.js"></script>
+    <datalist id="lineupPositionSuggestions">
+        <option value="//"></option>
+        <option value="P"></option>
+        <option value="C"></option>
+        <option value="1B"></option>
+        <option value="2B"></option>
+        <option value="3B"></option>
+        <option value="SS"></option>
+        <option value="LF"></option>
+        <option value="CF"></option>
+        <option value="RF"></option>
+        <option value="--"></option>
+    </datalist>
 </body>
 
 </html>
