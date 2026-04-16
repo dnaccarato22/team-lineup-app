@@ -18,6 +18,16 @@
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/master.css" rel="stylesheet">
     <link href="assets/css/lineup.css" rel="stylesheet">
+    <style>
+        .lineup-position-cell.is-invalid {
+            background-color: #f8d7da;
+        }
+
+        .lineup-position-cell.is-invalid .lineup-position-input {
+            border-color: #dc3545;
+            background-color: #fff5f5;
+        }
+    </style>
 </head>
 
 <body>
@@ -35,7 +45,7 @@
             </nav>
             <!-- end of navbar navigation -->
             <div class="content">
-                <div class="container">
+                <div class="container-fluid lineup-page-container">
                     <div class="row">
                         <div class="col-md-12 page-header">
                             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -150,12 +160,13 @@
                                     <div class="canvas-wrapper">
                                         <div id="lineupEditControls" class="lineup-edit-controls d-none mb-3">
                                             <button id="saveLineupBtn" type="button" class="btn btn-primary btn-sm" disabled>
-                                                Save
+                                                Save edits
                                             </button>
                                             <button id="cancelLineupEditsBtn" type="button" class="btn btn-outline-secondary btn-sm">
                                                 Cancel
                                             </button>
                                         </div>
+                                        <div id="lineupValidationMessage" class="alert alert-danger d-none mb-3 py-2" role="alert"></div>
                                         <div id="lineupResult" class="bg-light border rounded p-3">
                                             <div class="text-muted">Generate a lineup to see results.</div>
                                         </div>
@@ -219,6 +230,19 @@
     <script src="assets/js/logout.js"></script>
     <script src="assets/js/app-settings.js"></script>
     <script src="assets/js/lineup.js"></script>
+    <datalist id="lineupPositionSuggestions">
+        <option value="//"></option>
+        <option value="P"></option>
+        <option value="C"></option>
+        <option value="1B"></option>
+        <option value="2B"></option>
+        <option value="3B"></option>
+        <option value="SS"></option>
+        <option value="LF"></option>
+        <option value="CF"></option>
+        <option value="RF"></option>
+        <option value="--"></option>
+    </datalist>
 </body>
 
 </html>

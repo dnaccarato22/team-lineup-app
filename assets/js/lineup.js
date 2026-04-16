@@ -26,6 +26,7 @@ const cancelLineupEditsBtn = document.getElementById("cancelLineupEditsBtn");
 const downloadLineupBtn = document.getElementById("downloadLineupBtn");
 const lineupResult = document.getElementById("lineupResult");
 const lineupStatus = document.getElementById("lineupStatus");
+const lineupValidationMessage = document.getElementById("lineupValidationMessage");
 const generatedLineupSection = document.getElementById("generatedLineupSection");
 const availabilityModalElement = document.getElementById("availabilityModal");
 const availabilityModalSubtitle = document.getElementById("availabilityModalSubtitle");
@@ -73,10 +74,16 @@ const lineupState = {
     currentLineup: null,
     draftLineup: null,
     isEditing: false,
+    hasUnsavedChanges: false,
     draggedPlayerId: null,
     availabilityPlayerId: null,
     pitchingPlayerId: null,
-    touchDragActive: false
+    touchDragActive: false,
+    validationStatus: "idle",
+    validationMessage: "",
+    invalidSpotKeys: new Set(),
+    lastValidationRequestToken: 0,
+    pendingValidationRequests: 0
 };
 
 const availabilityModal = availabilityModalElement ? new bootstrap.Modal(availabilityModalElement) : null;
@@ -88,6 +95,14 @@ function getSettings() {
 
 function getPlayerId(player) {
     return player.player_id ?? player.id;
+}
+
+function getLineupId(lineup) {
+    return lineup?.lineup_id ?? lineup?.id ?? null;
+}
+
+function getLineupSpotKey(playerId, inning) {
+    return String(playerId) + ":" + String(inning);
 }
 
 function normalizeAvailableInnings(value) {
@@ -375,7 +390,9 @@ function resetRenderedLineupState() {
     lineupState.currentLineup = null;
     lineupState.draftLineup = null;
     lineupState.isEditing = false;
+    lineupState.hasUnsavedChanges = false;
     lineupState.draggedPlayerId = null;
+    resetLineupValidationState();
     lineupResult.innerHTML = '<div class="text-muted">Generate a lineup to see results.</div>';
     setLineupActionState();
 }
@@ -503,21 +520,193 @@ function normalizeLineupPayload(lineup) {
     return lineup;
 }
 
-function buildLineupPositionOptions(selectedPosition) {
-    const positions = LINEUP_POSITIONS.includes(selectedPosition)
-        ? LINEUP_POSITIONS
-        : [selectedPosition].concat(LINEUP_POSITIONS);
+function normalizeLineupPositionValue(value) {
+    return String(value ?? "").trim().toUpperCase();
+}
 
-    return positions.map((position) => {
-        const selectedAttribute = position === selectedPosition ? " selected" : "";
-        return '<option value="' + position + '"' + selectedAttribute + ">" + position + "</option>";
-    }).join("");
+function getEditingLineupStatusMessage() {
+    return "Editing lineup. Update positions or drag rows to change batting order, then save once validation passes.";
+}
+
+function resetLineupValidationState() {
+    lineupState.validationStatus = "idle";
+    lineupState.validationMessage = "";
+    lineupState.invalidSpotKeys = new Set();
+    lineupState.lastValidationRequestToken = 0;
+    lineupState.pendingValidationRequests = 0;
+    renderLineupValidationMessage();
+    applyRenderedInvalidSpots();
+}
+
+function renderLineupValidationMessage() {
+    if (!lineupValidationMessage) {
+        return;
+    }
+
+    const shouldShowMessage = Boolean(lineupState.validationMessage)
+        && (lineupState.validationStatus === "invalid" || lineupState.validationStatus === "error");
+
+    lineupValidationMessage.textContent = shouldShowMessage ? lineupState.validationMessage : "";
+    lineupValidationMessage.classList.toggle("d-none", !shouldShowMessage);
+}
+
+function applyRenderedInvalidSpots() {
+    lineupResult.querySelectorAll("[data-lineup-cell-player-id][data-lineup-cell-inning]").forEach((cell) => {
+        const playerId = cell.getAttribute("data-lineup-cell-player-id");
+        const inning = cell.getAttribute("data-lineup-cell-inning");
+        const isInvalid = lineupState.invalidSpotKeys.has(getLineupSpotKey(playerId, inning));
+
+        cell.classList.toggle("is-invalid", isInvalid);
+    });
+}
+
+function setLineupValidationResult(result) {
+    const invalidSpots = Array.isArray(result?.invalid_spots) ? result.invalid_spots : [];
+
+    lineupState.validationStatus = result?.is_valid ? "valid" : "invalid";
+    lineupState.validationMessage = result?.is_valid ? "" : String(result?.message || "One or more lineup changes are invalid.");
+    lineupState.invalidSpotKeys = new Set(invalidSpots.map((spot) => {
+        return getLineupSpotKey(spot.player_id, spot.inning);
+    }));
+    renderLineupValidationMessage();
+    applyRenderedInvalidSpots();
+}
+
+function setLineupValidationPending() {
+    lineupState.validationStatus = "pending";
+    lineupState.validationMessage = "";
+    lineupState.invalidSpotKeys = new Set();
+    renderLineupValidationMessage();
+    applyRenderedInvalidSpots();
+}
+
+function setLineupValidationError(message) {
+    lineupState.validationStatus = "error";
+    lineupState.validationMessage = message || "Unable to validate this lineup change right now.";
+    lineupState.invalidSpotKeys = new Set();
+    renderLineupValidationMessage();
+    applyRenderedInvalidSpots();
+}
+
+function getDraftLineupPlayer(playerId) {
+    if (!lineupState.draftLineup || !Array.isArray(lineupState.draftLineup.players)) {
+        return null;
+    }
+
+    return lineupState.draftLineup.players.find((candidate) => String(getPlayerId(candidate)) === String(playerId)) || null;
+}
+
+function buildPlayerInningPositionMap(player) {
+    const innings = Array.isArray(player?.innings) ? player.innings : [];
+
+    return new Map(innings.map((inningEntry) => {
+        return [Number.parseInt(inningEntry.inning, 10), normalizeLineupPositionValue(inningEntry.position) || "--"];
+    }));
+}
+
+function getUnsavedLineupPositionChanges() {
+    if (!lineupState.currentLineup || !lineupState.draftLineup) {
+        return [];
+    }
+
+    const currentPlayers = Array.isArray(lineupState.currentLineup.players) ? lineupState.currentLineup.players : [];
+    const draftPlayers = Array.isArray(lineupState.draftLineup.players) ? lineupState.draftLineup.players : [];
+    const currentPlayersById = new Map(currentPlayers.map((player) => [String(getPlayerId(player)), player]));
+
+    return draftPlayers.flatMap((draftPlayer) => {
+        const playerId = String(getPlayerId(draftPlayer));
+        const currentPlayer = currentPlayersById.get(playerId);
+        const currentPositions = buildPlayerInningPositionMap(currentPlayer);
+        const draftPositions = buildPlayerInningPositionMap(draftPlayer);
+        const inningNumbers = new Set([...currentPositions.keys(), ...draftPositions.keys()]);
+
+        return Array.from(inningNumbers)
+            .sort((firstInning, secondInning) => firstInning - secondInning)
+            .flatMap((inningNumber) => {
+                const currentPosition = currentPositions.get(inningNumber) || "--";
+                const draftPosition = draftPositions.get(inningNumber) || "--";
+
+                if (currentPosition === draftPosition) {
+                    return [];
+                }
+
+                return [{
+                    player_id: playerId,
+                    inning: inningNumber,
+                    position: draftPosition
+                }];
+            });
+    });
+}
+
+function hasDraftLineupChanges() {
+    if (!lineupState.currentLineup || !lineupState.draftLineup) {
+        return false;
+    }
+
+    const currentPlayers = Array.isArray(lineupState.currentLineup.players) ? lineupState.currentLineup.players : [];
+    const draftPlayers = Array.isArray(lineupState.draftLineup.players) ? lineupState.draftLineup.players : [];
+
+    if (currentPlayers.length !== draftPlayers.length) {
+        return true;
+    }
+
+    return draftPlayers.some((draftPlayer, index) => {
+        const currentPlayer = currentPlayers[index];
+
+        if (!currentPlayer) {
+            return true;
+        }
+
+        if (String(getPlayerId(draftPlayer)) !== String(getPlayerId(currentPlayer))) {
+            return true;
+        }
+
+        if (Number.parseInt(draftPlayer?.batting_order, 10) !== Number.parseInt(currentPlayer?.batting_order, 10)) {
+            return true;
+        }
+
+        const currentPositions = buildPlayerInningPositionMap(currentPlayer);
+        const draftPositions = buildPlayerInningPositionMap(draftPlayer);
+        const inningNumbers = new Set([...currentPositions.keys(), ...draftPositions.keys()]);
+
+        return Array.from(inningNumbers).some((inningNumber) => {
+            return (currentPositions.get(inningNumber) || "--") !== (draftPositions.get(inningNumber) || "--");
+        });
+    });
+}
+
+function upsertDraftLineupPosition(playerId, inningNumber, position) {
+    const player = getDraftLineupPlayer(playerId);
+
+    if (!player) {
+        return false;
+    }
+
+    const innings = Array.isArray(player.innings) ? player.innings : [];
+    const inningEntry = innings.find((candidate) => candidate.inning === inningNumber);
+
+    if (inningEntry) {
+        inningEntry.position = position;
+    } else {
+        innings.push({ inning: inningNumber, position });
+        innings.sort((firstEntry, secondEntry) => firstEntry.inning - secondEntry.inning);
+        player.innings = innings;
+    }
+
+    return true;
 }
 
 function setLineupActionState() {
     const hasLineup = Boolean(lineupState.currentLineup && Array.isArray(lineupState.currentLineup.players) && lineupState.currentLineup.players.length);
+    const hasBlockingValidationState = lineupState.validationStatus === "pending"
+        || lineupState.validationStatus === "invalid"
+        || lineupState.validationStatus === "error";
 
-    saveLineupBtn.disabled = !lineupState.isEditing || !lineupState.draftLineup;
+    saveLineupBtn.disabled = !lineupState.isEditing
+        || !lineupState.draftLineup
+        || !lineupState.hasUnsavedChanges
+        || hasBlockingValidationState;
     lineupEditControls.classList.toggle("d-none", !lineupState.isEditing);
     downloadLineupBtn.disabled = !hasLineup || lineupState.isEditing;
 }
@@ -803,6 +992,8 @@ function renderGeneratedLineup(lineup) {
         lineupState.currentLineup = null;
         lineupState.draftLineup = null;
         lineupState.isEditing = false;
+        lineupState.hasUnsavedChanges = false;
+        resetLineupValidationState();
         lineupResult.innerHTML = '<div class="text-muted">No lineup data was returned.</div>';
         setLineupActionState();
         return;
@@ -814,14 +1005,17 @@ function renderGeneratedLineup(lineup) {
         const inningMap = new Map((player.innings || []).map((inningEntry) => [inningEntry.inning, inningEntry.position]));
         const inningCells = inningNumbers.map((inningNumber) => {
             const position = inningMap.get(inningNumber) || "--";
+            const invalidClass = lineupState.invalidSpotKeys.has(getLineupSpotKey(getPlayerId(player), inningNumber))
+                ? " is-invalid"
+                : "";
 
             if (lineupState.isEditing) {
-                return '<td><select class="form-select form-select-sm lineup-position-select text-center" data-player-id="' + playerId + '" data-inning="' + inningNumber + '">' +
-                    buildLineupPositionOptions(position) +
-                "</select></td>";
+                return '<td class="lineup-position-cell' + invalidClass + '" data-lineup-cell-player-id="' + playerId + '" data-lineup-cell-inning="' + inningNumber + '">' +
+                    '<input type="text" maxlength="2" inputmode="text" enterkeyhint="done" list="lineupPositionSuggestions" class="form-control form-control-sm lineup-position-input text-center" data-player-id="' + playerId + '" data-inning="' + inningNumber + '" data-committed-position="' + escapeHtml(position) + '" value="' + escapeHtml(position) + '">' +
+                "</td>";
             }
 
-            return '<td class="text-center">' + position + '</td>';
+            return '<td class="text-center lineup-position-cell" data-lineup-cell-player-id="' + playerId + '" data-lineup-cell-inning="' + inningNumber + '">' + position + '</td>';
         }).join("");
 
         const rowAttributes = lineupState.isEditing
@@ -853,6 +1047,8 @@ function renderGeneratedLineup(lineup) {
                 '<tbody>' + lineupRows + '</tbody>' +
             '</table>' +
         '</div>';
+    renderLineupValidationMessage();
+    applyRenderedInvalidSpots();
     setLineupActionState();
 }
 
@@ -863,15 +1059,19 @@ function beginLineupEdit() {
 
     lineupState.draftLineup = normalizeLineupPayload(cloneData(lineupState.currentLineup));
     lineupState.isEditing = true;
+    lineupState.hasUnsavedChanges = false;
     lineupState.draggedPlayerId = null;
+    resetLineupValidationState();
     renderGeneratedLineup();
-    lineupStatus.textContent = "Editing lineup. Update positions or drag rows to change batting order, then save.";
+    lineupStatus.textContent = getEditingLineupStatusMessage();
 }
 
 function cancelLineupEdit() {
     lineupState.draftLineup = null;
     lineupState.isEditing = false;
+    lineupState.hasUnsavedChanges = false;
     lineupState.draggedPlayerId = null;
+    resetLineupValidationState();
     renderGeneratedLineup();
     lineupStatus.textContent = "Lineup edits discarded.";
 }
@@ -968,9 +1168,79 @@ function finishDraggedRowReorder(targetRow) {
         return false;
     }
 
+    lineupState.hasUnsavedChanges = hasDraftLineupChanges();
     renderGeneratedLineup();
-    lineupStatus.textContent = "Batting order updated locally. Save to apply changes.";
+    lineupStatus.textContent = getEditingLineupStatusMessage();
     return true;
+}
+
+async function validateEditedLineupPosition() {
+    const lineupId = getLineupId(lineupState.currentLineup) || getLineupId(lineupState.draftLineup);
+
+    if (!lineupId) {
+        setLineupValidationError("This lineup cannot be validated because it is missing a lineup ID.");
+        setLineupActionState();
+        return false;
+    }
+
+    const unsavedPositionChanges = getUnsavedLineupPositionChanges();
+
+    if (!unsavedPositionChanges.length) {
+        resetLineupValidationState();
+        setLineupActionState();
+        return true;
+    }
+
+    const requestToken = lineupState.lastValidationRequestToken + 1;
+
+    lineupState.lastValidationRequestToken = requestToken;
+    lineupState.pendingValidationRequests += 1;
+    setLineupValidationPending();
+    setLineupActionState();
+
+    try {
+        const response = await apiRequest("/lineup/" + encodeURIComponent(lineupId) + "/validate_position", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(unsavedPositionChanges)
+        }, {
+            showSlowOverlay: false
+        });
+
+        let payload = null;
+
+        try {
+            payload = await response.json();
+        } catch (error) {
+            payload = null;
+        }
+
+        if (requestToken !== lineupState.lastValidationRequestToken) {
+            return false;
+        }
+
+        if (!response.ok) {
+            setLineupValidationError(payload?.message || "Unable to validate this lineup change right now.");
+            return false;
+        }
+
+        setLineupValidationResult(payload || {});
+        return lineupState.validationStatus === "valid";
+    } catch (error) {
+        console.error("Error validating lineup position:", error);
+
+        if (requestToken === lineupState.lastValidationRequestToken) {
+            setLineupValidationError("Unable to validate this lineup change right now.");
+        }
+
+        return false;
+    } finally {
+        lineupState.pendingValidationRequests = Math.max(0, lineupState.pendingValidationRequests - 1);
+
+        if (requestToken === lineupState.lastValidationRequestToken) {
+            setLineupActionState();
+        }
+    }
 }
 
 async function saveEditedLineup() {
@@ -1011,7 +1281,9 @@ async function saveEditedLineup() {
         lineupState.currentLineup = normalizeLineupPayload(cloneData(savedLineup));
         lineupState.draftLineup = null;
         lineupState.isEditing = false;
+        lineupState.hasUnsavedChanges = false;
         lineupState.draggedPlayerId = null;
+        resetLineupValidationState();
         renderGeneratedLineup();
         persistLineupPageState();
         lineupStatus.textContent = "Lineup saved.";
@@ -1168,7 +1440,9 @@ async function generateLineup() {
         const data = await response.json();
         lineupState.draftLineup = null;
         lineupState.isEditing = false;
+        lineupState.hasUnsavedChanges = false;
         lineupState.draggedPlayerId = null;
+        resetLineupValidationState();
         renderGeneratedLineup(data);
         persistLineupPageState();
         lineupStatus.textContent = "Lineup generated.";
@@ -1248,33 +1522,64 @@ function handleEditPitchingClick(event) {
     openPitchingModal(editButton.getAttribute("data-player-id"));
 }
 
-lineupResult.addEventListener("change", (event) => {
-    const select = event.target.closest(".lineup-position-select");
-
-    if (!select || !lineupState.isEditing || !lineupState.draftLineup) {
+async function commitLineupPositionInput(input) {
+    if (!input || !lineupState.isEditing || !lineupState.draftLineup) {
         return;
     }
 
-    const playerId = select.getAttribute("data-player-id");
-    const inningNumber = Number.parseInt(select.getAttribute("data-inning"), 10);
-    const player = lineupState.draftLineup.players.find((candidate) => String(getPlayerId(candidate)) === playerId);
+    const playerId = input.getAttribute("data-player-id");
+    const inningNumber = Number.parseInt(input.getAttribute("data-inning"), 10);
+    const nextPosition = normalizeLineupPositionValue(input.value) || "--";
+    const committedPosition = normalizeLineupPositionValue(input.getAttribute("data-committed-position"));
 
-    if (!player) {
+    if (!playerId || Number.isNaN(inningNumber)) {
         return;
     }
 
-    const innings = Array.isArray(player.innings) ? player.innings : [];
-    const inningEntry = innings.find((candidate) => candidate.inning === inningNumber);
+    input.value = nextPosition;
 
-    if (inningEntry) {
-        inningEntry.position = select.value;
-    } else {
-        innings.push({ inning: inningNumber, position: select.value });
-        innings.sort((firstEntry, secondEntry) => firstEntry.inning - secondEntry.inning);
-        player.innings = innings;
+    if (nextPosition === committedPosition) {
+        return;
     }
 
-    lineupStatus.textContent = "Lineup updated locally. Save to apply changes.";
+    if (!upsertDraftLineupPosition(playerId, inningNumber, nextPosition)) {
+        return;
+    }
+
+    input.setAttribute("data-committed-position", nextPosition);
+    lineupState.hasUnsavedChanges = hasDraftLineupChanges();
+    setLineupActionState();
+    await validateEditedLineupPosition();
+}
+
+lineupResult.addEventListener("keydown", (event) => {
+    const input = event.target.closest(".lineup-position-input");
+
+    if (!input) {
+        return;
+    }
+
+    if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+        return;
+    }
+
+    if (event.key === "Escape") {
+        event.preventDefault();
+        input.value = input.getAttribute("data-committed-position") || "";
+        input.blur();
+    }
+});
+
+lineupResult.addEventListener("focusout", (event) => {
+    const input = event.target.closest(".lineup-position-input");
+
+    if (!input) {
+        return;
+    }
+
+    commitLineupPositionInput(input);
 });
 
 lineupResult.addEventListener("click", (event) => {

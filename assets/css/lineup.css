@@ -1,3 +1,7 @@
+.lineup-page-container {
+    max-width: 1640px;
+}
+
 @media (max-width: 767.98px) {
     .desktop-only {
         display: none !important;
@@ -158,8 +162,12 @@
     }
 }
 
-.lineup-position-select {
-    min-width: 4.5rem;
+.lineup-position-cell {
+    min-width: 4.75rem;
+}
+
+.lineup-position-input {
+    min-width: 4.25rem;
 }
 
 .lineup-game-date-group {
