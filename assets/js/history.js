@@ -448,6 +448,7 @@ function buildHistoryLineupTable(lineup, options = {}) {
     const normalizedLineup = normalizeHistoryLineup(cloneHistoryData(lineup));
     const inningNumbers = Array.from({ length: getHistorySettings().inningsToDisplay }, (_, index) => index + 1);
     const players = Array.isArray(normalizedLineup?.players) ? normalizedLineup.players : [];
+    const lineupId = getHistoryLineupKey(lineup, "unknown");
     const isEditable = options.editable === true;
 
     if (!players.length) {
@@ -485,7 +486,7 @@ function buildHistoryLineupTable(lineup, options = {}) {
     }).join("");
 
     return '<div class="table-responsive">' +
-        '<table class="table table-bordered table-striped align-middle mb-0 history-lineup-table">' +
+        '<table id="lineup-table-' + lineupId + '" class="table table-bordered table-striped align-middle mb-0 history-lineup-table">' +
             "<thead>" +
                 "<tr>" +
                     "<th>Player</th>" +
@@ -514,6 +515,7 @@ function buildHistoryLineupCard(lineup, options) {
     const subtitle = isNew ? "Start with every inning set to \"//\" and adjust as needed." : options.groupDateLabel;
     const canEdit = options.canEdit !== false;
     const canDelete = options.canDelete === true;
+    const canDownload = options.canDownload === true;
     const editorCardClass = isEditing ? " history-editor-card" : "";
     const editorAttribute = isEditing ? ' data-history-editor="active"' : "";
     const lineupId = options.lineupId ? escapeHtml(options.lineupId) : "";
@@ -545,6 +547,7 @@ function buildHistoryLineupCard(lineup, options) {
             '<button type="button" class="btn btn-outline-secondary btn-sm cancel-history-lineup-btn">Cancel</button>' +
         "</div>"
         : '<div class="history-lineup-editor-actions">' +
+            '<button type="button" class="btn btn-sm btn-outline-primary download-lineup-btn"' + (canDownload ? ' game-date="' + escapeHtml(lineup?.game_date) + '" data-lineup-id="' + lineupId + '"' : " disabled") + ">Download PDF</button>" +
             '<button type="button" class="btn btn-sm btn-outline-secondary edit-history-lineup-btn"' + (canEdit ? ' data-lineup-key="' + lineupKey + '"' : " disabled") + ">Edit</button>" +
             '<button type="button" class="btn btn-sm btn-outline-danger delete-lineup-btn"' + (canDelete ? ' data-lineup-id="' + lineupId + '"' : " disabled") + ">Delete</button>" +
         "</div>";
@@ -577,6 +580,7 @@ function buildHistoryGroupMarkup(group, groupIndex) {
             const lineupId = getHistoryStoredLineupId(lineup);
             const canDelete = lineupId !== null && lineupId !== undefined;
             const isEditing = historyState.editorMode === "edit" && historyState.editingLineupKey === lineupKey;
+            const canDownload = !isEditing;
             const lineupToRender = isEditing ? historyState.draftLineup : lineup;
 
             return buildHistoryLineupCard(lineupToRender, {
@@ -586,6 +590,7 @@ function buildHistoryGroupMarkup(group, groupIndex) {
                 lineupId,
                 canDelete,
                 canEdit: canDelete,
+                canDownload,
                 isEditing
             });
         }).join("")
@@ -620,6 +625,7 @@ function renderHistory() {
             lineupId: null,
             canDelete: false,
             isEditing: true,
+            canDownload: false,
             isNew: true
         })
         : "";
@@ -1169,11 +1175,84 @@ async function commitHistoryLineupPositionInput(input) {
     }
 }
 
+function getPrintableGameDateLabel(value) {
+    if (!value) {
+        return "";
+    }
+
+    const parsedDate = new Date(value + "T00:00:00");
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return value;
+    }
+
+    return parsedDate.toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric"
+    });
+}
+
+function downloadLineupPdf(lineupId, gameDate) {
+    const lineupTable = document.getElementById("lineup-table-" + lineupId);
+
+    if (!lineupTable) {
+        historyStatus.textContent = "Unable to download the PDF.";
+        return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+
+    if (!printWindow) {
+        historyStatus.textContent = "Unable to open the PDF preview window.";
+        return;
+    }
+
+    const printableGameDate = getPrintableGameDateLabel(gameDate);
+    const printTitle = printableGameDate ? printableGameDate + " Lineup" : "Lineup";
+
+    const printMarkup =
+        '<!doctype html>' +
+        '<html><head><title>lineup.pdf</title>' +
+        '<meta charset="utf-8">' +
+        '<style>' +
+            '@page{size:auto;margin:0.5in;}' +
+            'body{font-family:Arial,sans-serif;padding:24px;color:#212529;}' +
+            'h1{margin:0 0 16px;font-size:24px;}' +
+            'table{width:100%;border-collapse:collapse;}' +
+            'th,td{border:1px solid #ced4da;padding:8px;text-align:center;}' +
+            'th:first-child,td:first-child{text-align:left;}' +
+            'thead th{background:#f8f9fa;}' +
+        '</style></head><body>' +
+        '<h1>' + escapeHtml(printTitle) + '</h1>' +
+        lineupTable.outerHTML +
+        '<script>' +
+            'window.addEventListener("load", function () {' +
+                'setTimeout(function () {' +
+                    'window.focus();' +
+                    'window.print();' +
+                '}, 250);' +
+            '});' +
+        '<\/script>' +
+        '</body></html>';
+
+    printWindow.document.open();
+    printWindow.document.write(printMarkup);
+    printWindow.document.close();
+    historyStatus.textContent = "Opening PDF print preview...";
+}
+
 historyContent.addEventListener("click", (event) => {
     const deleteButton = event.target.closest(".delete-lineup-btn");
+    const downloadLineupBtn = event.target.closest(".download-lineup-btn");
 
     if (deleteButton) {
         deleteLineup(deleteButton.getAttribute("data-lineup-id"));
+        return;
+    }
+
+    if (downloadLineupBtn) {
+        downloadLineupPdf(downloadLineupBtn.getAttribute("data-lineup-id"), downloadLineupBtn.getAttribute("game-date"));
         return;
     }
 
