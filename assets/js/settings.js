@@ -108,13 +108,9 @@ async function exportPlayers() {
     dataAdminStatus.textContent = "Exporting players...";
 
     try {
-        const response = await apiRequest("/players");
-
-        if (!response.ok) {
-            throw new Error("Export request failed with status " + response.status + ".");
-        }
-
-        const data = await response.json();
+        const data = window.getAppDataResource
+            ? await window.getAppDataResource("players")
+            : [];
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
         const downloadUrl = URL.createObjectURL(blob);
         const downloadLink = document.createElement("a");
@@ -185,6 +181,10 @@ async function importPlayers() {
         dataAdminStatus.textContent = skippedCount
             ? "Imported " + importedCount + " players. Skipped " + skippedCount + "."
             : "Imported " + importedCount + " players.";
+        await window.refreshAppData?.({
+            resources: ["players", "lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         importPlayersFile.value = "";
     } catch (error) {
         console.error("Error importing players:", error);

@@ -9,6 +9,7 @@ document.addEventListener("click", function(event) {
     if (window.APP_SESSION_KEYS?.lineupPageState) {
         sessionStorage.removeItem(window.APP_SESSION_KEYS.lineupPageState);
     }
+    window.clearAppSessionData?.();
     sessionStorage.removeItem("loggedIn");
     window.location.href = "index.html";
 });

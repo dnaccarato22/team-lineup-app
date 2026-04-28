@@ -437,8 +437,9 @@ async function loadPlayers() {
     playerStatus.textContent = "Loading players...";
 
     try {
-        const response = await apiRequest("/players");
-        const data = await response.json();
+        const data = window.getAppDataResource
+            ? await window.getAppDataResource("players")
+            : [];
         playerState.players = Array.isArray(data) ? data : (data.players || []);
         playerStatus.textContent = playerState.players.length ? "Players loaded." : "No players returned by the API.";
         renderPlayers();
@@ -475,6 +476,10 @@ async function createPlayer() {
             }
         ]);
 
+        await window.refreshAppData?.({
+            resources: ["players", "lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         resetNewPlayerState();
         await loadPlayers();
         playerStatus.textContent = "Player created.";
@@ -513,6 +518,10 @@ async function updatePlayer(playerId) {
             }
         ]);
 
+        await window.refreshAppData?.({
+            resources: ["players", "lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         resetEditingState();
         await loadPlayers();
         playerStatus.textContent = "Player updated.";
@@ -547,6 +556,10 @@ async function deletePlayer(playerId) {
             }
         ]);
 
+        await window.refreshAppData?.({
+            resources: ["players", "lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         resetEditingState();
         await loadPlayers();
         playerStatus.textContent = "Player removed.";

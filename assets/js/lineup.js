@@ -428,17 +428,9 @@ function restorePersistedLineupPageState(savedState) {
 }
 
 async function loadLatestLineup() {
-    const response = await apiRequest("/latest_lineup");
-
-    if (!response.ok) {
-        if (response.status === 404) {
-            return null;
-        }
-
-        throw new Error("Latest lineup request failed with status " + response.status + ".");
-    }
-
-    return await response.json();
+    return window.getAppDataResource
+        ? await window.getAppDataResource("latestLineup")
+        : null;
 }
 
 function restoreRememberedRoster() {
@@ -1284,6 +1276,10 @@ async function saveEditedLineup() {
         lineupState.hasUnsavedChanges = false;
         lineupState.draggedPlayerId = null;
         resetLineupValidationState();
+        await window.refreshAppData?.({
+            resources: ["lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         renderGeneratedLineup();
         persistLineupPageState();
         lineupStatus.textContent = "Lineup saved.";
@@ -1349,8 +1345,12 @@ async function loadPlayers() {
     spinner.style.display = "block";
 
     try {
-        const response = await apiRequest("/players");
-        const data = await response.json();
+        const [data, latestLineup] = await Promise.all([
+            window.getAppDataResource
+                ? window.getAppDataResource("players")
+                : Promise.resolve([]),
+            loadLatestLineup()
+        ]);
         rosterState.allPlayers = Array.isArray(data) ? data : (data.players || []);
         setCurrentGameDate(getUpcomingSaturdayDateValue());
         const savedPageState = getPersistedLineupPageState();
@@ -1361,8 +1361,6 @@ async function loadPlayers() {
                 : "Players loaded.";
             return;
         }
-
-        const latestLineup = await loadLatestLineup();
 
         if (latestLineup && Array.isArray(latestLineup.players) && latestLineup.players.length) {
             setCurrentGameDate(latestLineup.game_date);
@@ -1443,6 +1441,10 @@ async function generateLineup() {
         lineupState.hasUnsavedChanges = false;
         lineupState.draggedPlayerId = null;
         resetLineupValidationState();
+        await window.refreshAppData?.({
+            resources: ["lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         renderGeneratedLineup(data);
         persistLineupPageState();
         lineupStatus.textContent = "Lineup generated.";

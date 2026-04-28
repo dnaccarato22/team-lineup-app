@@ -19,6 +19,10 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
         });
         if (res.ok) {
             sessionStorage.setItem("loggedIn", "true");
+            await window.preloadAppData?.({
+                force: true,
+                feedbackOptions: { showSlowOverlay: false }
+            });
             window.location.href = "lineup.html";
         } else {
             const data = await res.json();

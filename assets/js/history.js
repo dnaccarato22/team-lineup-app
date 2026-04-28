@@ -25,7 +25,9 @@ const historyState = {
     validationMessage: "",
     invalidSpotKeys: new Set(),
     lastValidationRequestToken: 0,
-    pendingValidationRequests: 0
+    pendingValidationRequests: 0,
+    newLineupPlayerSearchTerm: "",
+    newLineupPlayerDropdownOpen: false
 };
 
 function getHistorySettings() {
@@ -450,6 +452,7 @@ function buildHistoryLineupTable(lineup, options = {}) {
     const players = Array.isArray(normalizedLineup?.players) ? normalizedLineup.players : [];
     const lineupId = getHistoryLineupKey(lineup, "unknown");
     const isEditable = options.editable === true;
+    const allowRemove = options.allowRemove === true;
 
     if (!players.length) {
         return '<div class="text-center text-muted py-3">No players in this lineup.</div>';
@@ -476,13 +479,17 @@ function buildHistoryLineupTable(lineup, options = {}) {
         }).join("");
 
         const rowAttributes = isEditable
-            ? ' class="history-lineup-edit-row" draggable="true" data-player-id="' + playerId + '"'
+            ? ' class="history-lineup-edit-row" data-player-id="' + playerId + '"'
             : "";
         const playerCellContent = isEditable
-            ? '<span class="text-muted history-lineup-drag-handle" aria-hidden="true"><i class="fas fa-grip-vertical"></i></span>' + escapeHtml(getHistoryPlayerName(player))
+            ? '<span class="text-muted history-lineup-drag-handle" draggable="true" aria-hidden="true"><i class="fas fa-grip-vertical"></i></span>' + escapeHtml(getHistoryPlayerName(player))
             : escapeHtml(getHistoryPlayerName(player));
 
-        return "<tr" + rowAttributes + '><td class="fw-semibold text-nowrap">' + playerCellContent + "</td>" + inningCells + "</tr>";
+        const actionCell = allowRemove
+            ? '<td class="text-end text-nowrap"><button type="button" class="btn btn-sm btn-outline-danger remove-history-lineup-player-btn" data-player-id="' + playerId + '">Remove</button></td>'
+            : "";
+
+        return "<tr" + rowAttributes + '><td class="fw-semibold text-nowrap">' + playerCellContent + "</td>" + inningCells + actionCell + "</tr>";
     }).join("");
 
     return '<div class="table-responsive">' +
@@ -491,6 +498,7 @@ function buildHistoryLineupTable(lineup, options = {}) {
                 "<tr>" +
                     "<th>Player</th>" +
                     inningNumbers.map((inningNumber) => '<th class="text-center">' + inningNumber + "</th>").join("") +
+                    (allowRemove ? "<th></th>" : "") +
                 "</tr>" +
             "</thead>" +
             "<tbody>" + rows + "</tbody>" +
@@ -512,7 +520,7 @@ function buildHistoryLineupCard(lineup, options) {
     const isEditing = options.isEditing === true;
     const isNew = options.isNew === true;
     const title = isNew ? "New Lineup" : "Lineup " + (options.lineupIndex + 1);
-    const subtitle = isNew ? "Start with every inning set to \"//\" and adjust as needed." : options.groupDateLabel;
+    const subtitle = isNew ? "Start empty, add players, and set positions when you're ready." : options.groupDateLabel;
     const canEdit = options.canEdit !== false;
     const canDelete = options.canDelete === true;
     const canDownload = options.canDownload === true;
@@ -523,7 +531,7 @@ function buildHistoryLineupCard(lineup, options) {
     const saveLabel = isNew ? "Save Lineup" : "Save Changes";
     const editingNote = isEditing
         ? '<div class="text-muted small mb-2">' + (isNew
-            ? "Drag rows to set batting order, update positions, then save the lineup."
+            ? "Add players one at a time, drag rows to set batting order, and remove anyone you added by mistake."
             : "Drag rows to change batting order. Position changes are validated as you edit.") + "</div>"
         : "";
 
@@ -560,7 +568,8 @@ function buildHistoryLineupCard(lineup, options) {
             "</div>" +
             editingNote +
             (isEditing ? buildHistoryEditorValidationMarkup() : "") +
-            buildHistoryLineupTable(lineup, { editable: isEditing }) +
+            (isNew && isEditing ? buildHistoryNewLineupPlayerPicker() : "") +
+            buildHistoryLineupTable(lineup, { editable: isEditing, allowRemove: isNew && isEditing }) +
         "</div>" +
     "</div>";
 }
@@ -638,6 +647,7 @@ function renderHistory() {
         historyContent.innerHTML = newEditorMarkup + emptyStateMarkup;
         renderHistoryValidationMessage();
         applyRenderedInvalidSpots();
+        renderHistoryNewLineupPlayerOptions();
         renderHistoryActionState();
         return;
     }
@@ -648,6 +658,7 @@ function renderHistory() {
         "</div>";
     renderHistoryValidationMessage();
     applyRenderedInvalidSpots();
+    renderHistoryNewLineupPlayerOptions();
     renderHistoryActionState();
 }
 
@@ -689,6 +700,8 @@ function clearHistoryEditorState() {
     historyState.hasUnsavedChanges = false;
     historyState.draggedPlayerId = null;
     historyState.touchDragActive = false;
+    historyState.newLineupPlayerSearchTerm = "";
+    historyState.newLineupPlayerDropdownOpen = false;
     resetHistoryValidationState();
 }
 
@@ -700,23 +713,9 @@ function scrollActiveHistoryEditorIntoView() {
 }
 
 function createBlankHistoryLineup() {
-    if (!historyState.allPlayers.length) {
-        return null;
-    }
-
     return normalizeHistoryLineup({
         game_date: getDefaultNewLineupGameDate(),
-        players: sortHistoryPlayers(historyState.allPlayers).map((player, index) => {
-            return {
-                ...cloneHistoryData(player),
-                player_id: getHistoryPlayerId(player),
-                batting_order: index + 1,
-                innings: FULL_GAME_INNINGS.map((inningNumber) => ({
-                    inning: inningNumber,
-                    position: "//"
-                }))
-            };
-        })
+        players: []
     });
 }
 
@@ -744,10 +743,193 @@ function startNewHistoryLineup() {
     historyState.hasUnsavedChanges = true;
     historyState.draggedPlayerId = null;
     historyState.touchDragActive = false;
+    historyState.newLineupPlayerSearchTerm = "";
+    historyState.newLineupPlayerDropdownOpen = false;
     resetHistoryValidationState();
     renderHistory();
-    historyStatus.textContent = "New lineup ready. Set the game date, assign positions, and save when you're ready.";
+    historyStatus.textContent = "New lineup ready. Add players, assign positions, and save when you're ready.";
     scrollActiveHistoryEditorIntoView();
+}
+
+function buildNewHistoryLineupPlayer(player, battingOrder) {
+    return {
+        ...cloneHistoryData(player),
+        player_id: getHistoryPlayerId(player),
+        batting_order: battingOrder,
+        innings: FULL_GAME_INNINGS.map((inningNumber) => ({
+            inning: inningNumber,
+            position: "//"
+        }))
+    };
+}
+
+function reindexHistoryDraftPlayers(players) {
+    return players.map((player, index) => ({
+        ...player,
+        batting_order: index + 1
+    }));
+}
+
+function getHistoryNewLineupSearchText(player) {
+    return [
+        player?.first_name,
+        player?.last_name,
+        [player?.first_name, player?.last_name].filter(Boolean).join(" "),
+        [player?.last_name, player?.first_name].filter(Boolean).join(" "),
+        player?.name,
+        getHistoryPlayerName(player)
+    ].join(" ").toLowerCase();
+}
+
+function getAvailableHistoryNewLineupPlayers() {
+    if (historyState.editorMode !== "new" || !historyState.draftLineup) {
+        return [];
+    }
+
+    const selectedPlayerIds = new Set((historyState.draftLineup.players || []).map((player) => {
+        return String(getHistoryPlayerId(player));
+    }));
+    const normalizedSearchTerm = historyState.newLineupPlayerSearchTerm.trim().toLowerCase();
+
+    return sortHistoryPlayers(historyState.allPlayers).filter((player) => {
+        const playerId = String(getHistoryPlayerId(player));
+
+        if (!playerId || selectedPlayerIds.has(playerId)) {
+            return false;
+        }
+
+        if (!normalizedSearchTerm) {
+            return true;
+        }
+
+        return getHistoryNewLineupSearchText(player).includes(normalizedSearchTerm);
+    });
+}
+
+function renderHistoryNewLineupPlayerOptions() {
+    const playerSearchInput = document.getElementById("historyNewLineupPlayerSearch");
+    const playerSearchDropdown = document.getElementById("historyNewLineupPlayerSearchDropdown");
+
+    if (!playerSearchInput || !playerSearchDropdown) {
+        return;
+    }
+
+    playerSearchInput.value = historyState.newLineupPlayerSearchTerm;
+
+    if (!historyState.newLineupPlayerDropdownOpen) {
+        playerSearchDropdown.innerHTML = "";
+        playerSearchDropdown.style.display = "none";
+        return;
+    }
+
+    const availablePlayers = getAvailableHistoryNewLineupPlayers();
+    const normalizedSearchTerm = historyState.newLineupPlayerSearchTerm.trim().toLowerCase();
+
+    if (!availablePlayers.length) {
+        const emptyMessage = normalizedSearchTerm ? "No matching players found" : "No more players available";
+        playerSearchDropdown.innerHTML = '<button type="button" class="list-group-item list-group-item-action disabled">' + emptyMessage + "</button>";
+        playerSearchDropdown.style.display = "block";
+        updateHistoryNewLineupPlayerDropdownPosition();
+        return;
+    }
+
+    playerSearchDropdown.innerHTML = availablePlayers.map((player) => {
+        const playerId = String(getHistoryPlayerId(player)).replace(/"/g, "&quot;");
+        const playerName = getHistoryPlayerName(player);
+
+        return '<button type="button" class="list-group-item list-group-item-action history-player-search-option" data-player-id="' + playerId + '" data-player-name="' + escapeHtml(playerName) + '">' + escapeHtml(playerName) + "</button>";
+    }).join("");
+    playerSearchDropdown.style.display = "block";
+    updateHistoryNewLineupPlayerDropdownPosition();
+}
+
+function updateHistoryNewLineupPlayerDropdownPosition() {
+    const playerSearchInput = document.getElementById("historyNewLineupPlayerSearch");
+    const playerSearchDropdown = document.getElementById("historyNewLineupPlayerSearchDropdown");
+
+    if (!playerSearchInput || !playerSearchDropdown || !historyState.newLineupPlayerDropdownOpen) {
+        return;
+    }
+
+    const inputBounds = playerSearchInput.getBoundingClientRect();
+    const viewportPadding = 8;
+    const dropdownGap = 4;
+    const preferredMaxHeight = 256;
+    const spaceBelow = Math.max(window.innerHeight - inputBounds.bottom - viewportPadding, 0);
+    const spaceAbove = Math.max(inputBounds.top - viewportPadding, 0);
+    const shouldOpenUpward = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const availableHeight = Math.max((shouldOpenUpward ? spaceAbove : spaceBelow) - dropdownGap, 0);
+    const dropdownWidth = Math.min(inputBounds.width, window.innerWidth - (viewportPadding * 2));
+    const dropdownLeft = Math.min(
+        Math.max(inputBounds.left, viewportPadding),
+        Math.max(window.innerWidth - viewportPadding - dropdownWidth, viewportPadding)
+    );
+
+    playerSearchDropdown.style.position = "fixed";
+    playerSearchDropdown.style.left = dropdownLeft + "px";
+    playerSearchDropdown.style.width = dropdownWidth + "px";
+    playerSearchDropdown.style.maxHeight = Math.min(preferredMaxHeight, availableHeight) + "px";
+    playerSearchDropdown.style.top = shouldOpenUpward ? "auto" : Math.min(inputBounds.bottom + dropdownGap, window.innerHeight - viewportPadding) + "px";
+    playerSearchDropdown.style.bottom = shouldOpenUpward ? Math.max(window.innerHeight - inputBounds.top + dropdownGap, viewportPadding) + "px" : "auto";
+    playerSearchDropdown.style.zIndex = "1080";
+}
+
+function buildHistoryNewLineupPlayerPicker() {
+    return '<div class="history-lineup-editor-fields mb-3">' +
+        '<label for="historyNewLineupPlayerSearch" class="form-label">Add Players</label>' +
+        '<div class="position-relative">' +
+            '<input id="historyNewLineupPlayerSearch" type="text" class="form-control form-control-sm" autocomplete="off" placeholder="Select player names" value="' + escapeHtml(historyState.newLineupPlayerSearchTerm) + '">' +
+            '<div id="historyNewLineupPlayerSearchDropdown" class="list-group shadow-sm" style="display: none; overflow-y: auto;"></div>' +
+        "</div>" +
+    "</div>";
+}
+
+function addPlayerToNewHistoryLineup(playerId) {
+    if (historyState.editorMode !== "new" || !historyState.draftLineup || !playerId) {
+        return;
+    }
+
+    const currentPlayers = Array.isArray(historyState.draftLineup.players) ? historyState.draftLineup.players : [];
+
+    if (currentPlayers.some((player) => String(getHistoryPlayerId(player)) === String(playerId))) {
+        return;
+    }
+
+    const player = historyState.allPlayers.find((candidate) => String(getHistoryPlayerId(candidate)) === String(playerId));
+
+    if (!player) {
+        return;
+    }
+
+    historyState.draftLineup.players = [
+        ...currentPlayers,
+        buildNewHistoryLineupPlayer(player, currentPlayers.length + 1)
+    ];
+    historyState.hasUnsavedChanges = true;
+    historyState.newLineupPlayerSearchTerm = "";
+    historyState.newLineupPlayerDropdownOpen = false;
+    renderHistory();
+    historyStatus.textContent = getHistoryPlayerName(player) + " added to the lineup.";
+}
+
+function removePlayerFromNewHistoryLineup(playerId) {
+    if (historyState.editorMode !== "new" || !historyState.draftLineup || !playerId) {
+        return;
+    }
+
+    const currentPlayers = Array.isArray(historyState.draftLineup.players) ? historyState.draftLineup.players : [];
+    const playerToRemove = currentPlayers.find((player) => String(getHistoryPlayerId(player)) === String(playerId));
+
+    if (!playerToRemove) {
+        return;
+    }
+
+    historyState.draftLineup.players = reindexHistoryDraftPlayers(currentPlayers.filter((player) => {
+        return String(getHistoryPlayerId(player)) !== String(playerId);
+    }));
+    historyState.hasUnsavedChanges = true;
+    renderHistory();
+    historyStatus.textContent = getHistoryPlayerName(playerToRemove) + " removed from the lineup.";
 }
 
 function beginHistoryLineupEdit(lineupKey) {
@@ -773,6 +955,8 @@ function beginHistoryLineupEdit(lineupKey) {
     historyState.hasUnsavedChanges = false;
     historyState.draggedPlayerId = null;
     historyState.touchDragActive = false;
+    historyState.newLineupPlayerSearchTerm = "";
+    historyState.newLineupPlayerDropdownOpen = false;
     resetHistoryValidationState();
     renderHistory();
     historyStatus.textContent = getHistoryEditingStatusMessage();
@@ -993,6 +1177,10 @@ async function saveEditedHistoryLineup() {
             return;
         }
 
+        await window.refreshAppData?.({
+            resources: ["lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         clearHistoryEditorState();
         await loadHistory();
         historyStatus.textContent = "Lineup saved.";
@@ -1034,6 +1222,10 @@ async function saveNewHistoryLineup() {
             return;
         }
 
+        await window.refreshAppData?.({
+            resources: ["lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         clearHistoryEditorState();
         await loadHistory();
         historyStatus.textContent = "Lineup added.";
@@ -1057,13 +1249,9 @@ async function loadHistory() {
     historyStatus.textContent = "Loading lineup history...";
 
     try {
-        const response = await apiRequest("/lineups");
-
-        if (!response.ok) {
-            throw new Error("History request failed with status " + response.status + ".");
-        }
-
-        const data = await response.json();
+        const data = window.getAppDataResource
+            ? await window.getAppDataResource("lineups")
+            : [];
         historyState.historyGroups = Array.isArray(data) ? data : [];
         historyState.historyLoadFailed = false;
         renderHistory();
@@ -1084,14 +1272,10 @@ async function loadPlayersForNewLineups() {
     updateAddLineupButtonState();
 
     try {
-        const response = await apiRequest("/players");
-
-        if (!response.ok) {
-            throw new Error("Players request failed with status " + response.status + ".");
-        }
-
-        const data = await response.json();
-        historyState.allPlayers = data;
+        const data = window.getAppDataResource
+            ? await window.getAppDataResource("players")
+            : [];
+        historyState.allPlayers = Array.isArray(data) ? data : (data.players || []);
     } catch (error) {
         console.error("Error loading players for history add flow:", error);
         // historyState.allPlayers = [];
@@ -1121,6 +1305,10 @@ async function deleteLineup(lineupId) {
             throw new Error("Delete request failed with status " + response.status + ".");
         }
 
+        await window.refreshAppData?.({
+            resources: ["lineups", "latestLineup"],
+            feedbackOptions: { showSlowOverlay: false }
+        });
         await loadHistory();
         historyStatus.textContent = "Lineup deleted.";
     } catch (error) {
@@ -1243,6 +1431,20 @@ function downloadLineupPdf(lineupId, gameDate) {
 }
 
 historyContent.addEventListener("click", (event) => {
+    const playerSearchOption = event.target.closest(".history-player-search-option");
+
+    if (playerSearchOption) {
+        addPlayerToNewHistoryLineup(playerSearchOption.getAttribute("data-player-id"));
+        return;
+    }
+
+    const removePlayerButton = event.target.closest(".remove-history-lineup-player-btn");
+
+    if (removePlayerButton) {
+        removePlayerFromNewHistoryLineup(removePlayerButton.getAttribute("data-player-id"));
+        return;
+    }
+
     const deleteButton = event.target.closest(".delete-lineup-btn");
     const downloadLineupBtn = event.target.closest(".download-lineup-btn");
 
@@ -1273,7 +1475,32 @@ historyContent.addEventListener("click", (event) => {
     }
 });
 
+historyContent.addEventListener("input", (event) => {
+    if (event.target.id !== "historyNewLineupPlayerSearch") {
+        return;
+    }
+
+    historyState.newLineupPlayerSearchTerm = event.target.value;
+    historyState.newLineupPlayerDropdownOpen = true;
+    renderHistoryNewLineupPlayerOptions();
+});
+
+historyContent.addEventListener("focusin", (event) => {
+    if (event.target.id !== "historyNewLineupPlayerSearch") {
+        return;
+    }
+
+    historyState.newLineupPlayerDropdownOpen = true;
+    renderHistoryNewLineupPlayerOptions();
+});
+
 historyContent.addEventListener("keydown", (event) => {
+    if (event.target.id === "historyNewLineupPlayerSearch" && event.key === "Escape") {
+        historyState.newLineupPlayerDropdownOpen = false;
+        renderHistoryNewLineupPlayerOptions();
+        return;
+    }
+
     const input = event.target.closest(".history-lineup-position-input");
 
     if (!input) {
@@ -1310,7 +1537,8 @@ historyContent.addEventListener("change", (event) => {
 });
 
 historyContent.addEventListener("dragstart", (event) => {
-    const targetRow = event.target.closest(".history-lineup-edit-row");
+    const dragHandle = event.target.closest(".history-lineup-drag-handle");
+    const targetRow = dragHandle?.closest(".history-lineup-edit-row");
 
     if (!targetRow || !historyState.draftLineup) {
         return;
@@ -1412,7 +1640,33 @@ historyContent.addEventListener("touchcancel", () => {
     clearHistoryLineupDropTargets();
 });
 
+document.addEventListener("click", (event) => {
+    const playerSearchInput = document.getElementById("historyNewLineupPlayerSearch");
+    const playerSearchDropdown = document.getElementById("historyNewLineupPlayerSearchDropdown");
+
+    if (!playerSearchInput || !playerSearchDropdown) {
+        return;
+    }
+
+    if (event.target === playerSearchInput || playerSearchDropdown.contains(event.target)) {
+        return;
+    }
+
+    if (!historyState.newLineupPlayerDropdownOpen) {
+        return;
+    }
+
+    historyState.newLineupPlayerDropdownOpen = false;
+    renderHistoryNewLineupPlayerOptions();
+});
+
+window.addEventListener("resize", updateHistoryNewLineupPlayerDropdownPosition);
+document.addEventListener("scroll", updateHistoryNewLineupPlayerDropdownPosition, true);
+
 addLineupBtn?.addEventListener("click", startNewHistoryLineup);
 
-// loadPlayersForNewLineups();
-loadHistory();
+async function initializeHistoryPage() {
+    await Promise.all([loadHistory(), loadPlayersForNewLineups()]);
+}
+
+initializeHistoryPage();
